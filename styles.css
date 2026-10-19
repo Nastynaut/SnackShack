@@ -136,7 +136,7 @@ button:focus-visible {
   font-size: 1.35rem;
 }
 
-.mute-button[aria-pressed="true"] {
+.mute-button.is-muted {
   background: var(--disabled-bg);
   color: var(--disabled-text);
   box-shadow: none;
@@ -178,7 +178,9 @@ button:focus-visible {
   line-height: 1;
 }
 
-.screen-heading:focus {
+/* Keyboard focus only. A tap still moves focus here for screen readers,
+   but it should not draw the purple ring. */
+.screen-heading:focus-visible {
   outline: 5px solid var(--focus);
   outline-offset: 4px;
 }
@@ -276,7 +278,17 @@ button:focus-visible {
   border-radius: 20px;
   background: var(--paper);
   box-shadow: var(--chunky);
+}
+
+/* A long-press on iPad must not select the words or pop a callout. */
+.menu-item,
+.tab,
+.ticket,
+.summary-card,
+button {
+  -webkit-user-select: none;
   user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .menu-item:active {
@@ -371,6 +383,13 @@ button:focus-visible {
   font-size: 2rem;
   font-weight: 700;
   line-height: 1.15;
+}
+
+.ticket-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .ticket-lines {
@@ -544,6 +563,12 @@ button:focus-visible {
   cursor: not-allowed;
 }
 
+/* The check mark is an emoji, so it does not follow the gray text color.
+   Fade it while Done is disabled. */
+.done-button:disabled .btn-icon {
+  opacity: 0.35;
+}
+
 .edit-button {
   background: var(--paper);
 }
@@ -702,6 +727,44 @@ button:focus-visible {
     grid-template-rows: minmax(0, 1.15fr) minmax(200px, 0.9fr);
     gap: 10px;
     padding: 4px 10px 10px;
+  }
+
+  /* One line per snack, so + / − fit in the short ticket under the menu. */
+  .ticket-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .line-each {
+    display: none;
+  }
+
+  .qty {
+    grid-column: auto;
+    gap: 6px;
+  }
+
+  /* Two classes, so this beats the 64px circle in buttons.css. */
+  .qty .qty-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 1.5rem;
+  }
+
+  .ticket .done-button {
+    min-height: 56px;
+    font-size: 1.3rem;
+  }
+
+  .total-row {
+    margin-bottom: 4px;
+  }
+
+  .total-row strong {
+    font-size: 2rem;
   }
 
   .menu-grid,

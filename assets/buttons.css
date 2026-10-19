@@ -31,8 +31,12 @@
   height: 40px;
   flex: none;
 }
-.btn:hover {
-  filter: brightness(1.05);
+/* Only devices with a real pointer get a hover wash.
+   On a tablet, :hover sticks after a tap and looks stuck. */
+@media (hover: hover) {
+  .btn:hover {
+    filter: brightness(1.05);
+  }
 }
 .btn:active,
 .btn.is-pressed {

@@ -19,6 +19,10 @@
   // from making a number the ticket cannot show cleanly.
   var MAX_QUANTITY = 99;
 
+  // Biggest price we will add up. Bigger than this, and the total
+  // turns into scientific notation like $1e+21.
+  var MAX_PRICE = 999;
+
   // id -> snack object from the menu.
   var itemsById = {};
 
@@ -69,6 +73,22 @@
 
     MENU.categories.forEach(function (category) {
       var kept = [];
+      var label = category.label || "A category";
+
+      // No items key at all used to crash (undefined has no forEach).
+      // Treat that the same as an empty list, and say so.
+      if (!Array.isArray(category.items)) {
+        problems.push(
+          label + " has no snacks list. In menu.js, add items: [ ] under that category."
+        );
+        category.items = [];
+        return;
+      }
+
+      if (category.items.length === 0) {
+        problems.push(label + " has no snacks yet.");
+        return;
+      }
 
       category.items.forEach(function (item) {
         if (!item.id || !item.name) {
@@ -84,14 +104,9 @@
           );
           return;
         }
-        // Number.isInteger rejects 2.5 and rejects the string "3".
-        if (!Number.isInteger(item.price) || item.price < 0) {
-          problems.push(
-            item.name +
-              " is hidden because its price is " +
-              item.price +
-              ". Use a whole number like 3."
-          );
+        var priceNote = priceProblem(item);
+        if (priceNote) {
+          problems.push(priceNote);
           return;
         }
         itemsById[item.id] = item;
@@ -106,6 +121,33 @@
     }
 
     return problems;
+  }
+
+  // Why a price was skipped, in words a parent can match to menu.js.
+  // A string "3" is shown with quotes, so it does not look like the number 3.
+  function describePrice(price) {
+    if (typeof price === "string") {
+      return '"' + price + '"';
+    }
+    return String(price);
+  }
+
+  function priceProblem(item) {
+    var price = item.price;
+    if (price === undefined || price === null || price === "") {
+      return item.name + " is hidden because it has no price. Use a whole number like 3.";
+    }
+    // Number.isInteger rejects 2.5, NaN, and the string "3".
+    // Anything over MAX_PRICE would print like $1e+21.
+    if (typeof price !== "number" || !Number.isInteger(price) || price < 0 || price > MAX_PRICE) {
+      return (
+        item.name +
+        " is hidden because its price is " +
+        describePrice(price) +
+        ". Use a whole number from 0 to 999."
+      );
+    }
+    return "";
   }
 
   // A yellow note under the title. Plain words, not an error alarm.
@@ -262,8 +304,9 @@
   function renderMuteButton() {
     var button = document.getElementById("mute-button");
     var icon = document.getElementById("mute-icon");
-    // The visible word stays "Sound". The picture shows on or off.
-    button.setAttribute("aria-pressed", soundMuted ? "true" : "false");
+    // The visible word stays "Sound". The picture and the accessible
+    // name say on or off. No aria-pressed: the name already says it.
+    button.classList.toggle("is-muted", soundMuted);
     if (soundMuted) {
       icon.textContent = "🔇";
       button.setAttribute("aria-label", "Sound is off. Tap to turn sound on.");
@@ -337,7 +380,7 @@
     state.quantities = {};
     state.addedIds = [];
     state.screen = "menu";
-    state.categoryId = MENU.categories[0].id;
+    state.categoryId = firstOpenCategoryId() || MENU.categories[0].id;
     say("New order. The ticket is empty.");
     renderTabs();
     renderMenuGrid();
@@ -373,6 +416,10 @@
     } else {
       document.getElementById("summary-heading").focus({ preventScroll: true });
     }
+
+    // The summary was hidden while we measured it. Check the hint now.
+    fitTicketLines();
+    updateScrollHint();
   }
 
   function selectCategory(id) {
@@ -384,10 +431,24 @@
     renderMenuGrid();
   }
 
+  function firstOpenCategoryId() {
+    var i;
+    for (i = 0; i < MENU.categories.length; i++) {
+      var category = MENU.categories[i];
+      if (category.items && category.items.length > 0) {
+        return category.id;
+      }
+    }
+    return "";
+  }
+
   function focusSelectedTab() {
     var selected = tabsEl.querySelector(".tab.is-selected");
+    if (!selected) {
+      selected = tabsEl.querySelector(".tab");
+    }
     if (selected) {
-      selected.focus();
+      selected.focus({ preventScroll: true });
     }
   }
 
@@ -395,6 +456,11 @@
     tabsEl.innerHTML = "";
 
     MENU.categories.forEach(function (category) {
+      // Empty categories already have a yellow note. Skip the blank tab.
+      if (!category.items || category.items.length === 0) {
+        return;
+      }
+
       var tab = document.createElement("button");
       tab.type = "button";
       tab.className = "tab";
@@ -521,7 +587,7 @@
 
   function renderMenuGrid() {
     var category = findCategory(state.categoryId);
-    var items = category.items;
+    var items = category.items || [];
     gridEl.innerHTML = "";
     gridEl.setAttribute("aria-label", category.label);
 
@@ -595,27 +661,98 @@
     doneButton.disabled = state.addedIds.length === 0;
 
     if (restoreId && restoreAction) {
-      var again = ticketLinesEl.querySelector(
-        'button[data-id="' + restoreId + '"][data-action="' + restoreAction + '"]'
-      );
-      // The row is gone (quantity hit 0). Move to whatever button is left.
-      if (!again) {
-        again = ticketLinesEl.querySelector("button");
-      }
-      if (again) {
-        again.focus({ preventScroll: true });
-      }
+      restoreTicketFocus(restoreId, restoreAction);
     }
 
+    fitTicketLines();
     updateScrollHint();
   }
 
-  // "More below" when the ticket list is taller than the space it has.
-  function updateScrollHint() {
-    var hint = document.getElementById("ticket-scroll-hint");
-    var extra = ticketLinesEl.scrollHeight - ticketLinesEl.clientHeight;
-    var atEnd = ticketLinesEl.scrollTop + ticketLinesEl.clientHeight >= ticketLinesEl.scrollHeight - 4;
+  // Put keyboard focus back after the ticket is rebuilt.
+  // A disabled + cannot hold focus, and neither can a deleted row.
+  function restoreTicketFocus(id, action) {
+    var button = ticketLinesEl.querySelector(
+      'button[data-id="' + id + '"][data-action="' + action + '"]'
+    );
+
+    // + just hit 99 and is now disabled. Land on that row's −.
+    if (button && button.disabled) {
+      button = ticketLinesEl.querySelector(
+        'button[data-id="' + id + '"][data-action="minus"]'
+      );
+    }
+
+    // The row is gone (quantity hit 0). Move to a button that is left.
+    if (!button || button.disabled) {
+      button = ticketLinesEl.querySelector("button:not([disabled])");
+    }
+
+    if (button) {
+      button.focus({ preventScroll: true });
+      return;
+    }
+
+    // Last line removed. Land on the open tab (or the first one).
+    focusSelectedTab();
+  }
+
+  // Show only whole ticket rows, so a + / − is never half cut off.
+  // The extra gap stays above the total, inside the ticket.
+  function fitTicketLines() {
+    ticketLinesEl.style.maxHeight = "";
+    if (menuScreen.hidden) {
+      return;
+    }
+
+    var row = ticketLinesEl.querySelector(".ticket-row");
+    if (!row) {
+      return;
+    }
+
+    var rowHeight = row.getBoundingClientRect().height;
+    var room = ticketLinesEl.clientHeight;
+    if (rowHeight < 1 || room < 1) {
+      return;
+    }
+
+    // Everything fits. Leave the list filling the ticket.
+    if (ticketLinesEl.scrollHeight <= room + 1) {
+      return;
+    }
+
+    var fit = Math.floor((room + 0.5) / rowHeight);
+    if (fit < 1) {
+      return;
+    }
+
+    var used = fit * rowHeight;
+    // One row taller than the space: keep the space we have.
+    if (used > room + 0.5) {
+      return;
+    }
+    if (room - used > 1) {
+      ticketLinesEl.style.maxHeight = used + "px";
+    }
+  }
+
+  // "More below" when a list is taller than the space it has.
+  function updateOneHint(linesEl, hint, active) {
+    if (!active) {
+      hint.hidden = true;
+      return;
+    }
+    var extra = linesEl.scrollHeight - linesEl.clientHeight;
+    var atEnd = linesEl.scrollTop + linesEl.clientHeight >= linesEl.scrollHeight - 4;
     hint.hidden = extra <= 4 || atEnd;
+  }
+
+  function updateScrollHint() {
+    updateOneHint(ticketLinesEl, document.getElementById("ticket-scroll-hint"), !menuScreen.hidden);
+    updateOneHint(
+      summaryLinesEl,
+      document.getElementById("summary-scroll-hint"),
+      !summaryScreen.hidden
+    );
   }
 
   function makeTicketRow(item, quantity) {
@@ -696,6 +833,7 @@
     var noun = count === 1 ? "item" : "items";
     summaryCountEl.textContent = count + " " + noun;
     summaryTotalEl.textContent = formatDollars(orderTotal());
+    updateScrollHint();
   }
 
   // Ticket, badges, and summary all read the same order.
@@ -723,7 +861,7 @@
       return;
     }
 
-    state.categoryId = MENU.categories[0].id;
+    state.categoryId = firstOpenCategoryId() || MENU.categories[0].id;
 
     // + and - are recreated every time the ticket redraws,
     // so one listener on the list catches all of them.
@@ -770,7 +908,18 @@
     });
 
     ticketLinesEl.addEventListener("scroll", updateScrollHint);
-    window.addEventListener("resize", updateScrollHint);
+    summaryLinesEl.addEventListener("scroll", updateScrollHint);
+    window.addEventListener("resize", function () {
+      fitTicketLines();
+      updateScrollHint();
+    });
+    // Row height can change once Fredoka finishes loading.
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(function () {
+        fitTicketLines();
+        updateScrollHint();
+      });
+    }
 
     // Yellow note when a price or id was skipped. Hidden when the menu is fine.
     showMenuNotes(problems);

@@ -5,12 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Snack Shack</title>
   <!--
-    Fredoka and Nunito live in assets/fonts/. This file only points at
-    those woff2 files. Nothing is loaded from the internet. If the
-    folder is missing, the browser keeps its own fonts.
+    Our own stylesheet is the whole look. It does not load anything
+    from the internet. Fredoka and Nunito come in through tokens.css,
+    which already imports assets/fonts/fonts.css. Linking that file
+    here too would load it twice.
   -->
-  <link rel="stylesheet" href="assets/fonts/fonts.css">
-  <!-- Our own stylesheet is the whole look. It does not load anything from the internet. -->
   <link rel="stylesheet" href="styles.css">
   <!--
     Optional designer files. If they are not in the folder yet, the browser
@@ -32,7 +31,7 @@
         <p class="tagline">One of you runs the register. One of you orders.</p>
       </div>
       <!-- The word stays "Sound". Only the speaker picture changes. -->
-      <button type="button" id="mute-button" class="mute-button btn btn--secondary" aria-pressed="false" aria-label="Sound is on. Tap to turn sound off.">
+      <button type="button" id="mute-button" class="mute-button btn btn--secondary" aria-label="Sound is on. Tap to turn sound off.">
         <span id="mute-icon" class="btn-icon" aria-hidden="true">🔊</span>
         <span class="btn-label">Sound</span>
       </button>
@@ -50,9 +49,12 @@
 
     <aside class="ticket" aria-label="Order ticket">
       <h2 class="ticket-title">Ticket</h2>
-      <div id="ticket-lines" class="ticket-lines"></div>
-      <!-- Shown only when the list is taller than the ticket. -->
-      <p id="ticket-scroll-hint" class="ticket-scroll-hint" hidden>More below</p>
+      <!-- The list grows to fill the ticket. The hint sits under it. -->
+      <div class="ticket-body">
+        <div id="ticket-lines" class="ticket-lines"></div>
+        <!-- Shown only when the list is taller than the ticket. -->
+        <p id="ticket-scroll-hint" class="ticket-scroll-hint" hidden>More below</p>
+      </div>
       <div class="ticket-footer">
         <p class="total-row">
           <span>Total</span>
@@ -79,6 +81,8 @@
         <span>Price</span>
       </div>
       <div id="summary-lines" class="summary-lines"></div>
+      <!-- Same hint as the ticket, when the summary list is taller than the card. -->
+      <p id="summary-scroll-hint" class="ticket-scroll-hint" hidden>More below</p>
       <p class="total-row summary-total">
         <span>Total</span>
         <strong id="summary-total">$0</strong>

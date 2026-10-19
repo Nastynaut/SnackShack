@@ -15,7 +15,7 @@
 // Each snack needs:
 //   id     A short unique name. No spaces. Used inside the code.
 //   name   What kids see on the button and on the ticket.
-//   price  Whole dollars only. Write 3, not 3.00 and not "3".
+//   price  Whole dollars only, from 0 to 999. Write 3, not 3.00 and not "3".
 //          The app adds these as integers so totals stay exact.
 //   emoji  Placeholder picture until a real drawing exists.
 //          Cheeseburger uses a burger (not a cheese wedge), chicken
