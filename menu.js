@@ -9,6 +9,7 @@
 // Each category needs:
 //   id     A short name the code uses. No spaces.
 //   label  The word on the tab (Food, Drinks, Treats).
+//   emoji  A picture on the tab, for kids who are still learning to read.
 //   items  The snacks in that tab.
 //
 // Each snack needs:
@@ -17,6 +18,10 @@
 //   price  Whole dollars only. Write 3, not 3.00 and not "3".
 //          The app adds these as integers so totals stay exact.
 //   emoji  Placeholder picture until a real drawing exists.
+//          Cheeseburger uses a burger (not a cheese wedge), chicken
+//          nuggets use a chicken (not a drumstick), and milkshake uses
+//          a tall cup (not a glass of milk). Those are the closest
+//          single emoji. The SVG replaces them when the file is there.
 //   image  The designer's SVG, named with hyphens:
 //          assets/food/burger.svg, cheeseburger.svg, hot-dog.svg,
 //          fries.svg, chicken-nuggets.svg, pizza-slice.svg,
@@ -33,6 +38,7 @@ var MENU = {
     {
       id: "food",
       label: "Food",
+      emoji: "🍔",
       items: [
         {
           id: "burger",
@@ -45,7 +51,7 @@ var MENU = {
           id: "cheeseburger",
           name: "Cheeseburger",
           price: 4,
-          emoji: "🧀",
+          emoji: "🍔",
           image: "assets/food/cheeseburger.svg"
         },
         {
@@ -66,7 +72,7 @@ var MENU = {
           id: "chicken-nuggets",
           name: "Chicken Nuggets",
           price: 3,
-          emoji: "🍗",
+          emoji: "🐔",
           image: "assets/food/chicken-nuggets.svg"
         },
         {
@@ -81,6 +87,7 @@ var MENU = {
     {
       id: "drinks",
       label: "Drinks",
+      emoji: "🥤",
       items: [
         {
           id: "soda",
@@ -100,7 +107,7 @@ var MENU = {
           id: "milkshake",
           name: "Milkshake",
           price: 3,
-          emoji: "🥛",
+          emoji: "🧋",
           image: "assets/food/milkshake.svg"
         },
         {
@@ -115,6 +122,7 @@ var MENU = {
     {
       id: "treats",
       label: "Treats",
+      emoji: "🍦",
       items: [
         {
           id: "ice-cream-cone",

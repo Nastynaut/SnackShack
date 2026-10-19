@@ -87,10 +87,16 @@ button:focus-visible {
 
 .topbar {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 20px;
+}
+
+.topbar-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 8px 20px;
 }
 
 .brand h1 {
@@ -110,6 +116,11 @@ button:focus-visible {
 
 .mute-button {
   flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 148px;
   min-height: 64px;
   padding: 0 22px;
   border: 4px solid var(--outline);
@@ -117,8 +128,12 @@ button:focus-visible {
   background: var(--paper);
   box-shadow: var(--chunky);
   font-family: var(--font-sign);
-  font-size: 1.2rem;
   font-weight: 700;
+}
+
+/* Two classes beat the single .btn rule in buttons.css, so "Sound" stays this size. */
+.topbar .mute-button {
+  font-size: 1.35rem;
 }
 
 .mute-button[aria-pressed="true"] {
@@ -130,6 +145,42 @@ button:focus-visible {
 .mute-button:active {
   transform: translateY(4px);
   box-shadow: var(--chunky-pressed);
+}
+
+.menu-note {
+  padding: 10px 14px;
+  border: 3px solid var(--outline);
+  border-radius: 16px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.05rem;
+  max-height: 120px;
+  overflow: auto;
+}
+
+.menu-note p {
+  margin: 0 0 4px;
+}
+
+.menu-note p:last-child {
+  margin: 0;
+}
+
+.menu-note-title {
+  font-weight: 800;
+}
+
+/* The picture sits beside the word for kids who are still learning to read.
+   aria-hidden in the HTML, so a screen reader says the word only. */
+.btn-icon {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.25em;
+  line-height: 1;
+}
+
+.screen-heading:focus {
+  outline: 5px solid var(--focus);
+  outline-offset: 4px;
 }
 
 /* ----------------------------------------------------------------
@@ -159,6 +210,10 @@ button:focus-visible {
 
 .tab {
   flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 64px;
   border: 4px solid var(--outline);
   border-radius: 999px;
@@ -166,7 +221,7 @@ button:focus-visible {
   color: var(--ink);
   box-shadow: var(--chunky);
   font-family: var(--font-sign);
-  font-size: 1.4rem;
+  font-size: 1.35rem;
   font-weight: 700;
 }
 
@@ -200,6 +255,11 @@ button:focus-visible {
   overflow: auto;
 }
 
+/* Drinks and Treats have fewer snacks, so two bigger columns. */
+.menu-grid.is-few {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .menu-item {
   position: relative;
   display: flex;
@@ -209,6 +269,7 @@ button:focus-visible {
   gap: 4px;
   width: 100%;
   height: 100%;
+  min-width: 0;
   max-height: 320px;
   padding: 8px 8px 12px;
   border: 4px solid var(--outline);
@@ -258,6 +319,8 @@ button:focus-visible {
   font-weight: 700;
   line-height: 1.15;
   text-align: center;
+  max-width: 100%;
+  overflow-wrap: break-word;
 }
 
 .item-price {
@@ -316,6 +379,15 @@ button:focus-visible {
   overflow: auto;
 }
 
+.ticket-scroll-hint {
+  margin: 0;
+  padding: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .ticket-empty {
   display: grid;
   place-items: center;
@@ -369,9 +441,14 @@ button:focus-visible {
   place-items: center;
   box-shadow: var(--chunky);
   font-family: var(--font-sign);
-  font-size: 2.2rem;
   font-weight: 700;
   line-height: 1;
+}
+
+/* buttons.css loads after this file and sets .btn { font-size: 24px }.
+   One class cannot beat two classes, so the + and − stay big. */
+.qty .qty-button {
+  font-size: 2.2rem;
 }
 
 .qty-minus {
@@ -426,17 +503,27 @@ button:focus-visible {
 .done-button,
 .edit-button,
 .new-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
   min-height: 64px;
   border: 4px solid var(--outline);
   border-radius: 20px;
   box-shadow: var(--chunky);
   font-family: var(--font-sign);
-  font-size: 1.6rem;
   font-weight: 700;
 }
 
-.done-button {
+/* Same idea as .qty .qty-button: two classes beat .btn in buttons.css,
+   so these words do not shrink when that file shows up. */
+.summary-actions .edit-button,
+.summary-actions .new-button {
+  font-size: 1.6rem;
+}
+
+.ticket .done-button {
   min-height: 88px;
   background: var(--yellow);
   font-size: 2rem;
@@ -584,5 +671,218 @@ button:focus-visible {
 
   .item-name {
     font-size: 1.45rem;
+  }
+}
+
+/* Narrower than a landscape iPad: two columns so names are not crushed.
+   768-wide portrait is in this range. Phones are too. */
+@media (max-width: 900px) {
+  .menu-grid,
+  .menu-grid.is-few {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phone portrait. The ticket sits under the menu instead of covering it. */
+@media (max-width: 700px) {
+  .topbar {
+    padding: 6px 12px;
+  }
+
+  .brand h1 {
+    font-size: 1.55rem;
+  }
+
+  .tagline {
+    font-size: 0.95rem;
+  }
+
+  .menu-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1.15fr) minmax(200px, 0.9fr);
+    gap: 10px;
+    padding: 4px 10px 10px;
+  }
+
+  .tabs {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tab {
+    min-height: 56px;
+    font-size: 1rem;
+    padding: 0 4px;
+  }
+
+  .picture {
+    height: 72px;
+  }
+
+  .emoji {
+    font-size: 52px;
+  }
+
+  .picture img {
+    width: 72px;
+    height: 72px;
+  }
+
+  .summary-screen {
+    padding: 4px 10px 10px;
+  }
+
+  .summary-card {
+    padding: 12px 14px;
+  }
+
+  .summary-columns,
+  .summary-row {
+    grid-template-columns: minmax(0, 1fr) 72px 72px;
+    gap: 8px;
+    font-size: 1.2rem;
+  }
+
+  .summary-total strong {
+    font-size: 2.6rem;
+  }
+
+  .summary-actions {
+    gap: 10px;
+  }
+}
+
+/* Phone landscape. Very little height, so pictures and rows shrink
+   and the ticket list scrolls instead of clipping prices. */
+@media (max-height: 500px) {
+  .awning {
+    height: 8px;
+  }
+
+  .topbar {
+    padding: 4px 10px;
+  }
+
+  .brand h1 {
+    font-size: 1.3rem;
+  }
+
+  .tagline {
+    display: none;
+  }
+
+  .mute-button,
+  .topbar .mute-button {
+    min-height: 44px;
+    min-width: 120px;
+    font-size: 1rem;
+  }
+
+  .menu-screen {
+    gap: 8px;
+    padding: 4px 8px 8px;
+  }
+
+  .tabs {
+    margin-bottom: 6px;
+  }
+
+  .tab {
+    min-height: 40px;
+    font-size: 0.95rem;
+    box-shadow: 0 3px 0 var(--outline);
+  }
+
+  .menu-grid {
+    gap: 6px;
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .menu-item {
+    height: auto;
+    max-height: none;
+    padding: 4px 4px 6px;
+    border-bottom-width: 4px;
+    box-shadow: 0 3px 0 var(--outline);
+  }
+
+  .picture {
+    height: 36px;
+  }
+
+  .emoji {
+    font-size: 28px;
+  }
+
+  .picture img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .item-name {
+    font-size: 0.85rem;
+  }
+
+  .item-price {
+    font-size: 0.8rem;
+    padding: 0 6px;
+  }
+
+  .ticket {
+    padding: 6px 8px;
+  }
+
+  .ticket-title {
+    font-size: 1.15rem;
+  }
+
+  .ticket-row {
+    padding: 2px 0;
+  }
+
+  .line-each {
+    display: none;
+  }
+
+  .line-name {
+    font-size: 0.95rem;
+  }
+
+  .line-price {
+    font-size: 1rem;
+  }
+
+  .qty {
+    gap: 4px;
+  }
+
+  .qty-button {
+    width: 40px;
+    height: 40px;
+    border-width: 3px;
+    box-shadow: 0 3px 0 var(--outline);
+  }
+
+  .qty .qty-button {
+    font-size: 1.35rem;
+  }
+
+  .qty-number {
+    font-size: 1.1rem;
+  }
+
+  .total-row {
+    margin-bottom: 4px;
+    font-size: 1rem;
+  }
+
+  .total-row strong {
+    font-size: 1.5rem;
+  }
+
+  .ticket .done-button {
+    min-height: 48px;
+    font-size: 1.15rem;
   }
 }

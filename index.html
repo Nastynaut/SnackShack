@@ -20,11 +20,19 @@
   <div class="awning" aria-hidden="true"></div>
 
   <header class="topbar">
-    <div class="brand">
-      <h1>Snack Shack</h1>
-      <p class="tagline">One of you runs the register. One of you orders.</p>
+    <div class="topbar-row">
+      <div class="brand">
+        <h1>Snack Shack</h1>
+        <p class="tagline">One of you runs the register. One of you orders.</p>
+      </div>
+      <!-- The word stays "Sound". Only the speaker picture changes. -->
+      <button type="button" id="mute-button" class="mute-button btn btn--secondary" aria-pressed="false" aria-label="Sound is on. Tap to turn sound off.">
+        <span id="mute-icon" class="btn-icon" aria-hidden="true">🔊</span>
+        <span class="btn-label">Sound</span>
+      </button>
     </div>
-    <button type="button" id="mute-button" class="mute-button btn btn--secondary" aria-pressed="false">Sound on</button>
+    <!-- Filled in by app.js when a price or id in menu.js needs a fix. -->
+    <div id="menu-note" class="menu-note" hidden></div>
   </header>
 
   <!-- Screen 1: pick snacks. The ticket on the right is the order. -->
@@ -37,12 +45,17 @@
     <aside class="ticket" aria-label="Order ticket">
       <h2 class="ticket-title">Ticket</h2>
       <div id="ticket-lines" class="ticket-lines"></div>
+      <!-- Shown only when the list is taller than the ticket. -->
+      <p id="ticket-scroll-hint" class="ticket-scroll-hint" hidden>More below</p>
       <div class="ticket-footer">
         <p class="total-row">
           <span>Total</span>
           <strong id="ticket-total">$0</strong>
         </p>
-        <button type="button" id="done-button" class="done-button btn btn--checkout" disabled>Done</button>
+        <button type="button" id="done-button" class="done-button btn btn--checkout" disabled>
+          <span class="btn-icon" aria-hidden="true">✅</span>
+          <span>Done</span>
+        </button>
       </div>
     </aside>
   </main>
@@ -51,7 +64,7 @@
   <main id="summary-screen" class="summary-screen" hidden>
     <section class="summary-card">
       <header class="summary-heading">
-        <h2>Here's the order</h2>
+        <h2 id="summary-heading" class="screen-heading" tabindex="-1">Here's the order</h2>
         <p id="summary-count" class="summary-count"></p>
       </header>
       <div class="summary-columns" aria-hidden="true">
@@ -65,8 +78,14 @@
         <strong id="summary-total">$0</strong>
       </p>
       <div class="summary-actions">
-        <button type="button" id="edit-order" class="edit-button btn btn--secondary">Edit Order</button>
-        <button type="button" id="new-order" class="new-button btn btn--primary">New Order</button>
+        <button type="button" id="edit-order" class="edit-button btn btn--secondary">
+          <span class="btn-icon" aria-hidden="true">✏️</span>
+          <span>Edit Order</span>
+        </button>
+        <button type="button" id="new-order" class="new-button btn btn--primary">
+          <span class="btn-icon" aria-hidden="true">🔄</span>
+          <span>New Order</span>
+        </button>
       </div>
     </section>
   </main>

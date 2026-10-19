@@ -35,6 +35,10 @@
     addedIds: []
   };
 
+  // "ok" once an SVG loads, "missing" if the file is not there.
+  // A missing picture is requested only the first time.
+  var pictureStatus = {};
+
   var menuScreen = document.getElementById("menu-screen");
   var summaryScreen = document.getElementById("summary-screen");
   var tabsEl = document.getElementById("category-tabs");
@@ -51,13 +55,14 @@
   // Menu lookup
   // ----------------------------------------------------------
 
-  // Build itemsById once. Warn in the console (not on screen)
-  // when a price or id would make totals wrong.
+  // Build itemsById once. A bad price or a repeated id is skipped
+  // so the total cannot go wrong. We say why on the page and in
+  // the console, so a menu edit is easy to spot.
   function prepareMenu() {
     var problems = [];
 
     if (!window.MENU || !MENU.categories) {
-      problems.push("MENU is missing. Keep menu.js next to index.html.");
+      problems.push("menu.js did not load. Keep it in the same folder as index.html.");
       console.warn(problems[0]);
       return problems;
     }
@@ -67,17 +72,25 @@
 
       category.items.forEach(function (item) {
         if (!item.id || !item.name) {
-          problems.push("A snack is missing an id or a name.");
+          problems.push("One snack is hidden because it needs both a name and an id.");
           return;
         }
         if (itemsById[item.id]) {
-          problems.push(item.name + " reuses id '" + item.id + "'.");
+          problems.push(
+            item.name +
+              " is hidden because another snack already uses the id \"" +
+              item.id +
+              "\". Give it a different id."
+          );
           return;
         }
         // Number.isInteger rejects 2.5 and rejects the string "3".
         if (!Number.isInteger(item.price) || item.price < 0) {
           problems.push(
-            item.name + " has price " + item.price + ". Use a whole number like 3."
+            item.name +
+              " is hidden because its price is " +
+              item.price +
+              ". Use a whole number like 3."
           );
           return;
         }
@@ -89,10 +102,34 @@
     });
 
     if (problems.length > 0) {
-      console.warn("Snack Shack menu issues:\n- " + problems.join("\n- "));
+      console.warn("Snack Shack menu notes:\n- " + problems.join("\n- "));
     }
 
     return problems;
+  }
+
+  // A yellow note under the title. Plain words, not an error alarm.
+  function showMenuNotes(problems) {
+    var note = document.getElementById("menu-note");
+    note.textContent = "";
+
+    if (!problems || problems.length === 0) {
+      note.hidden = true;
+      return;
+    }
+
+    var title = document.createElement("p");
+    title.className = "menu-note-title";
+    title.textContent = "Check menu.js, then save and refresh.";
+    note.appendChild(title);
+
+    for (var i = 0; i < problems.length; i++) {
+      var line = document.createElement("p");
+      line.textContent = problems[i];
+      note.appendChild(line);
+    }
+
+    note.hidden = false;
   }
 
   function findCategory(id) {
@@ -224,8 +261,16 @@
 
   function renderMuteButton() {
     var button = document.getElementById("mute-button");
+    var icon = document.getElementById("mute-icon");
+    // The visible word stays "Sound". The picture shows on or off.
     button.setAttribute("aria-pressed", soundMuted ? "true" : "false");
-    button.textContent = soundMuted ? "Sound off" : "Sound on";
+    if (soundMuted) {
+      icon.textContent = "🔇";
+      button.setAttribute("aria-label", "Sound is off. Tap to turn sound on.");
+    } else {
+      icon.textContent = "🔊";
+      button.setAttribute("aria-label", "Sound is on. Tap to turn sound off.");
+    }
   }
 
   // ----------------------------------------------------------
@@ -297,17 +342,53 @@
     renderTabs();
     renderMenuGrid();
     renderOrder();
-    showScreen();
+    showScreen(true);
   }
 
   // ----------------------------------------------------------
   // Drawing
   // ----------------------------------------------------------
 
-  function showScreen() {
+  function showScreen(moveFocus) {
     var onMenu = state.screen === "menu";
     menuScreen.hidden = !onMenu;
     summaryScreen.hidden = onMenu;
+
+    if (!moveFocus) {
+      return;
+    }
+
+    // Summary: land on the heading (it is not in the normal tab order).
+    // Back on the menu: land on Done when there is an order, otherwise
+    // the first tab, so keyboard users are not left on a hidden screen.
+    if (onMenu) {
+      if (!doneButton.disabled) {
+        doneButton.focus({ preventScroll: true });
+      } else {
+        var firstTab = tabsEl.querySelector(".tab");
+        if (firstTab) {
+          firstTab.focus({ preventScroll: true });
+        }
+      }
+    } else {
+      document.getElementById("summary-heading").focus({ preventScroll: true });
+    }
+  }
+
+  function selectCategory(id) {
+    if (state.categoryId === id) {
+      return;
+    }
+    state.categoryId = id;
+    renderTabs();
+    renderMenuGrid();
+  }
+
+  function focusSelectedTab() {
+    var selected = tabsEl.querySelector(".tab.is-selected");
+    if (selected) {
+      selected.focus();
+    }
   }
 
   function renderTabs() {
@@ -319,19 +400,52 @@
       tab.className = "tab";
       tab.setAttribute("role", "tab");
       tab.setAttribute("data-category", category.id);
-      tab.textContent = category.label;
+      tab.setAttribute("aria-controls", "menu-grid");
+      // The word is the accessible name. The emoji is just a picture.
+      tab.setAttribute("aria-label", category.label);
+      if (category.emoji) {
+        var icon = document.createElement("span");
+        icon.className = "btn-icon";
+        icon.setAttribute("aria-hidden", "true");
+        icon.textContent = category.emoji;
+        tab.appendChild(icon);
+      }
+      tab.appendChild(document.createTextNode(category.label));
 
       var selected = category.id === state.categoryId;
       tab.classList.toggle("is-selected", selected);
       tab.setAttribute("aria-selected", selected ? "true" : "false");
+      // Only the open tab is in the tab order. Arrow keys move between them.
+      tab.tabIndex = selected ? 0 : -1;
 
       tab.addEventListener("click", function () {
-        if (state.categoryId === category.id) {
+        selectCategory(category.id);
+      });
+
+      tab.addEventListener("keydown", function (event) {
+        var tabs = tabsEl.querySelectorAll(".tab");
+        var index = 0;
+        var i;
+        for (i = 0; i < tabs.length; i++) {
+          if (tabs[i] === tab) {
+            index = i;
+          }
+        }
+        var next = index;
+        if (event.key === "ArrowRight") {
+          next = (index + 1) % tabs.length;
+        } else if (event.key === "ArrowLeft") {
+          next = (index - 1 + tabs.length) % tabs.length;
+        } else if (event.key === "Home") {
+          next = 0;
+        } else if (event.key === "End") {
+          next = tabs.length - 1;
+        } else {
           return;
         }
-        state.categoryId = category.id;
-        renderTabs();
-        renderMenuGrid();
+        event.preventDefault();
+        selectCategory(tabs[next].getAttribute("data-category"));
+        focusSelectedTab();
       });
 
       tabsEl.appendChild(tab);
@@ -354,16 +468,23 @@
     emoji.textContent = item.emoji;
     picture.appendChild(emoji);
 
-    if (item.image) {
+    if (item.image && pictureStatus[item.id] !== "missing") {
       var img = document.createElement("img");
       img.alt = "";
       // Hidden until it loads, so a missing file never flashes a broken icon.
-      img.hidden = true;
+      img.hidden = pictureStatus[item.id] !== "ok";
+      if (pictureStatus[item.id] === "ok") {
+        emoji.hidden = true;
+      }
       img.addEventListener("load", function () {
+        pictureStatus[item.id] = "ok";
         img.hidden = false;
         emoji.hidden = true;
       });
       img.addEventListener("error", function () {
+        // Remember the miss. The next time this snack is drawn,
+        // we skip the image so the browser does not ask again.
+        pictureStatus[item.id] = "missing";
         img.hidden = true;
         emoji.hidden = false;
       });
@@ -405,9 +526,9 @@
     gridEl.setAttribute("aria-label", category.label);
 
     // 4 or fewer snacks read better as two big columns
-    // (Drinks is 2x2, Treats is a pair). Food stays 3 across.
-    var columns = items.length <= 4 ? 2 : 3;
-    gridEl.style.gridTemplateColumns = "repeat(" + columns + ", minmax(0, 1fr))";
+    // (Drinks is 2x2, Treats is a pair). Food stays 3 across
+    // until the screen is narrow — that case is in styles.css.
+    gridEl.classList.toggle("is-few", items.length <= 4);
 
     items.forEach(function (item) {
       gridEl.appendChild(makeMenuButton(item));
@@ -445,6 +566,16 @@
   }
 
   function renderTicket() {
+    // Rebuilding the rows drops keyboard focus. Remember which
+    // + or − was pressed so we can put focus back on the new one.
+    var active = document.activeElement;
+    var restoreId = "";
+    var restoreAction = "";
+    if (active && ticketLinesEl.contains(active)) {
+      restoreId = active.getAttribute("data-id") || "";
+      restoreAction = active.getAttribute("data-action") || "";
+    }
+
     ticketLinesEl.innerHTML = "";
 
     if (state.addedIds.length === 0) {
@@ -462,6 +593,29 @@
     ticketTotalEl.textContent = formatDollars(total);
     // Done stays quiet until there is something to summarize.
     doneButton.disabled = state.addedIds.length === 0;
+
+    if (restoreId && restoreAction) {
+      var again = ticketLinesEl.querySelector(
+        'button[data-id="' + restoreId + '"][data-action="' + restoreAction + '"]'
+      );
+      // The row is gone (quantity hit 0). Move to whatever button is left.
+      if (!again) {
+        again = ticketLinesEl.querySelector("button");
+      }
+      if (again) {
+        again.focus({ preventScroll: true });
+      }
+    }
+
+    updateScrollHint();
+  }
+
+  // "More below" when the ticket list is taller than the space it has.
+  function updateScrollHint() {
+    var hint = document.getElementById("ticket-scroll-hint");
+    var extra = ticketLinesEl.scrollHeight - ticketLinesEl.clientHeight;
+    var atEnd = ticketLinesEl.scrollTop + ticketLinesEl.clientHeight >= ticketLinesEl.scrollHeight - 4;
+    hint.hidden = extra <= 4 || atEnd;
   }
 
   function makeTicketRow(item, quantity) {
@@ -593,7 +747,7 @@
       }
       state.screen = "summary";
       renderSummary();
-      showScreen();
+      showScreen(true);
       // Cha-ching. Silent if assets/sounds/checkout.mp3 is missing.
       playCheckout();
       say("Order summary. Total " + formatDollars(orderTotal()) + ".");
@@ -601,7 +755,7 @@
 
     document.getElementById("edit-order").addEventListener("click", function () {
       state.screen = "menu";
-      showScreen();
+      showScreen(true);
       say("Back on the menu. The ticket was kept.");
     });
 
@@ -615,16 +769,16 @@
       say(soundMuted ? "Sound off." : "Sound on.");
     });
 
+    ticketLinesEl.addEventListener("scroll", updateScrollHint);
+    window.addEventListener("resize", updateScrollHint);
+
+    // Yellow note when a price or id was skipped. Hidden when the menu is fine.
+    showMenuNotes(problems);
+
     renderTabs();
     renderMenuGrid();
     renderOrder();
     showScreen();
-
-    if (problems.length > 0) {
-      // Kids still get a working register. The details are in the console
-      // for whoever is editing menu.js.
-      console.warn("Snack Shack is running, but some menu lines were skipped.");
-    }
   }
 
   init();
