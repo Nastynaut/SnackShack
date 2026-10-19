@@ -704,6 +704,17 @@ button:focus-visible {
     padding: 4px 10px 10px;
   }
 
+  .menu-grid,
+  .menu-grid.is-few {
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .menu-item {
+    height: auto;
+    max-height: none;
+  }
+
   .tabs {
     gap: 6px;
     margin-bottom: 8px;
@@ -860,11 +871,18 @@ button:focus-visible {
   .qty-button {
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
     border-width: 3px;
     box-shadow: 0 3px 0 var(--outline);
   }
 
+  /* Two classes, so this beats .btn and .btn--icon in buttons.css. */
   .qty .qty-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
     font-size: 1.35rem;
   }
 

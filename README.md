@@ -77,7 +77,7 @@ If either file is missing, that sound stays silent. **−** does not play a soun
 
 The app does not need either file. A note in the browser console that they failed to load is expected until they are added.
 
-Fonts stay on the device. This page does not load fonts from the internet. `tokens.css` can name Fredoka and Nunito; until matching files are self-hosted in `assets/fonts/` and a stylesheet points at them, the browser uses its own sans-serif and serif fonts.
+Fonts stay on the device. `index.html` links `assets/fonts/fonts.css`, which points at the Fredoka and Nunito files in that same folder. Nothing is downloaded from the internet. If those files are missing, the browser uses its own fonts instead.
 
 ## Files
 

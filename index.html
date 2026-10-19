@@ -4,12 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Snack Shack</title>
+  <!--
+    Fredoka and Nunito live in assets/fonts/. This file only points at
+    those woff2 files. Nothing is loaded from the internet. If the
+    folder is missing, the browser keeps its own fonts.
+  -->
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
   <!-- Our own stylesheet is the whole look. It does not load anything from the internet. -->
   <link rel="stylesheet" href="styles.css">
   <!--
     Optional designer files. If they are not in the folder yet, the browser
     skips them and styles.css still covers the page.
-    tokens.css  — palette (colors, type, spacing)
+    tokens.css  — palette (colors, type, spacing). It names Fredoka and Nunito.
     buttons.css — extra styles for buttons that use the .btn classes
     Load tokens first so buttons.css can use those colors.
   -->
