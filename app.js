@@ -388,8 +388,7 @@
       body.hidden = !open;
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       arrow.textContent = open ? "\u25BE" : "\u25B8";
-      fitTicketLines();
-      updateScrollHint();
+      refitTicket();
     });
 
     note.appendChild(toggle);
@@ -668,8 +667,7 @@
     }
 
     // The summary was hidden while we measured it. Check the hint now.
-    fitTicketLines();
-    updateScrollHint();
+    refitTicket();
   }
 
   function selectCategory(id) {
@@ -922,8 +920,7 @@
       restoreTicketFocus(restoreId, restoreAction);
     }
 
-    fitTicketLines();
-    updateScrollHint();
+    refitTicket();
   }
 
   // Put keyboard focus back after the ticket is rebuilt.
@@ -1009,11 +1006,28 @@
   function updateOneHint(linesEl, hint, active) {
     if (!active) {
       hint.hidden = true;
+      hint.style.visibility = "";
       return;
     }
     var extra = linesEl.scrollHeight - linesEl.clientHeight;
     var atEnd = linesEl.scrollTop + linesEl.clientHeight >= linesEl.scrollHeight - 4;
-    hint.hidden = extra <= 4 || atEnd;
+    if (extra <= 4) {
+      hint.hidden = true;
+      hint.style.visibility = "";
+      return;
+    }
+    // Stay in the layout even at the bottom. Hiding it with
+    // display:none made the list taller and cut the last row.
+    hint.hidden = false;
+    hint.style.visibility = atEnd ? "hidden" : "visible";
+  }
+
+  // Size the list, then let the hint take its space, then size again.
+  function refitTicket() {
+    updateScrollHint();
+    fitTicketLines();
+    updateScrollHint();
+    fitTicketLines();
   }
 
   function updateScrollHint() {
@@ -1188,14 +1202,12 @@
     ticketLinesEl.addEventListener("scroll", updateScrollHint);
     summaryLinesEl.addEventListener("scroll", updateScrollHint);
     window.addEventListener("resize", function () {
-      fitTicketLines();
-      updateScrollHint();
+      refitTicket();
     });
     // Row height can change once Fredoka finishes loading.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function () {
-        fitTicketLines();
-        updateScrollHint();
+        refitTicket();
       });
     }
 
