@@ -704,14 +704,9 @@
       return;
     }
 
-    var row = ticketLinesEl.querySelector(".ticket-row");
-    if (!row) {
-      return;
-    }
-
-    var rowHeight = row.getBoundingClientRect().height;
+    var rows = ticketLinesEl.querySelectorAll(".ticket-row");
     var room = ticketLinesEl.clientHeight;
-    if (rowHeight < 1 || room < 1) {
+    if (!rows.length || room < 1) {
       return;
     }
 
@@ -720,14 +715,21 @@
       return;
     }
 
-    var fit = Math.floor((room + 0.5) / rowHeight);
-    if (fit < 1) {
-      return;
+    // Keep only whole rows. A long name can be a little taller
+    // than "Soda", so add them up instead of assuming one height.
+    var origin = rows[0].getBoundingClientRect().top;
+    var used = 0;
+    var fit = 0;
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      var bottom = rows[i].getBoundingClientRect().bottom - origin;
+      if (bottom > room + 0.5) {
+        break;
+      }
+      used = bottom;
+      fit += 1;
     }
-
-    var used = fit * rowHeight;
-    // One row taller than the space: keep the space we have.
-    if (used > room + 0.5) {
+    if (fit < 1) {
       return;
     }
     if (room - used > 1) {
@@ -759,17 +761,24 @@
     var row = document.createElement("div");
     row.className = "ticket-row";
 
+    // Name, with the each-price tucked under it when the row has room.
+    var main = document.createElement("div");
+    main.className = "line-main";
+
     var name = document.createElement("span");
     name.className = "line-name";
     name.textContent = item.name;
 
-    var linePrice = document.createElement("span");
-    linePrice.className = "line-price";
-    linePrice.textContent = formatDollars(lineTotal(item, quantity));
-
     var each = document.createElement("span");
     each.className = "line-each";
     each.textContent = formatDollars(item.price) + " each";
+
+    main.appendChild(name);
+    main.appendChild(each);
+
+    var linePrice = document.createElement("span");
+    linePrice.className = "line-price";
+    linePrice.textContent = formatDollars(lineTotal(item, quantity));
 
     var qty = document.createElement("div");
     qty.className = "qty";
@@ -799,9 +808,8 @@
     qty.appendChild(number);
     qty.appendChild(plus);
 
-    row.appendChild(name);
+    row.appendChild(main);
     row.appendChild(linePrice);
-    row.appendChild(each);
     row.appendChild(qty);
     return row;
   }

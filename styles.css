@@ -191,7 +191,8 @@ button:focus-visible {
 
 .menu-screen {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
+  /* Wide enough for a name, $297, and two 64px buttons on one line. */
+  grid-template-columns: minmax(0, 1fr) 460px;
   gap: 16px;
   padding: 4px 16px 14px;
   min-height: 0;
@@ -372,6 +373,7 @@ button {
 .ticket {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
   padding: 14px 16px 14px;
 }
@@ -418,28 +420,42 @@ button {
   text-align: center;
 }
 
+/* Name and the small "each" price on the left. Line price and
+   − / qty / + sit on the same line, so more rows fit on an iPad. */
 .ticket-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 2px 10px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0 8px;
   align-items: center;
-  padding: 8px 0;
+  padding: 4px 0 6px;
   border-bottom: 3px dashed var(--cream-deep);
 }
 
+.line-main {
+  min-width: 0;
+}
+
 .line-name {
-  font-size: 1.25rem;
+  display: block;
+  font-size: 1.05rem;
   font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: break-word;
 }
 
 .line-each {
+  display: block;
+  margin-top: 1px;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 0.78rem;
+  line-height: 1.1;
 }
 
 .line-price {
-  font-size: 1.4rem;
+  font-size: 1.15rem;
   font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -447,8 +463,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 10px;
-  grid-column: 1 / -1;
+  gap: 6px;
 }
 
 .qty-button {
@@ -464,10 +479,15 @@ button {
   line-height: 1;
 }
 
-/* buttons.css loads after this file and sets .btn { font-size: 24px }.
-   One class cannot beat two classes, so the + and − stay big. */
+/* buttons.css loads after this file and sets .btn { font-size: 24px }
+   and .btn--icon to a 64px circle. Two classes beat one class, so the
+   + and − stay 64px on a tablet no matter which file loads last. */
 .qty .qty-button {
-  font-size: 2.2rem;
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 2rem;
 }
 
 .qty-minus {
@@ -689,7 +709,7 @@ button {
 /* A wider tablet gets a slightly wider ticket. */
 @media (min-width: 1200px) {
   .menu-screen {
-    grid-template-columns: minmax(0, 1fr) 400px;
+    grid-template-columns: minmax(0, 1fr) 480px;
     gap: 20px;
     padding: 6px 20px 18px;
   }
@@ -700,11 +720,54 @@ button {
 }
 
 /* Narrower than a landscape iPad: two columns so names are not crushed.
-   768-wide portrait is in this range. Phones are too. */
+   768-wide portrait is in this range. Phones are too.
+   The ticket stays wide enough for a name, $297, and two 64px
+   buttons, so the three tabs have to share what's left. */
 @media (max-width: 900px) {
   .menu-grid,
   .menu-grid.is-few {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tabs {
+    min-width: 0;
+  }
+
+  .tab {
+    min-width: 0;
+  }
+}
+
+/* Portrait iPad: the ticket keeps the wide one-line row, so the
+   tabs share a narrower menu. Words stay inside the pills. */
+@media (max-width: 900px) and (min-width: 701px) {
+  .tabs {
+    gap: 6px;
+  }
+
+  .tab {
+    gap: 4px;
+    padding: 0 4px;
+    overflow: hidden;
+    font-size: 0.95rem;
+  }
+
+  .tab .btn-icon {
+    font-size: 1rem;
+  }
+
+  /* Two snack columns in a narrow menu. Keep the picture inside the card. */
+  .picture {
+    height: 72px;
+  }
+
+  .emoji {
+    font-size: 56px;
+  }
+
+  .picture img {
+    width: 72px;
+    height: 72px;
   }
 }
 
