@@ -54,13 +54,13 @@ Contrast (WCAG AA, computed):
 | `#2B1D3A` on `#FF8FC0` (text-on-color / desserts) | 7.42:1 | PASS |
 | `#5C5266` on `#E6E1EA` (disabled-text / disabled-bg) | 5.72:1 | PASS |
 
-## Fonts (free Google Fonts, SIL OFL 1.1)
+## Fonts (self-hosted, SIL OFL 1.1)
 - Headings, buttons, prices: **Fredoka** 600/700. Body: **Nunito** 400–800.
-- Link from Google Fonts (no font files in the repo):
+- Fonts are self-hosted in `assets/fonts/`. The app makes no network calls for fonts.
+- Weights included: Fredoka 400–700 and Nunito 400/600/700/800 (latin subset).
+- Load them by linking `assets/tokens.css`, which imports `fonts/fonts.css`, or by linking `assets/fonts/fonts.css` directly:
 ```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/tokens.css">
 ```
 - Type scale: 56 (screen title) · 40 (section / total) · 32 (ticket item, checkout, qty) · 24 (buttons, menu names) · 20 (body minimum) · 18/16 (captions only). Line height 1.15 headings, 1.4 body.
 
