@@ -333,7 +333,8 @@ button {
   line-height: 1.15;
   text-align: center;
   max-width: 100%;
-  overflow-wrap: break-word;
+  /* Wrap between words. "Cheeseburger" stays one word. */
+  overflow-wrap: normal;
 }
 
 .item-price {
@@ -720,9 +721,7 @@ button {
 }
 
 /* Narrower than a landscape iPad: two columns so names are not crushed.
-   768-wide portrait is in this range. Phones are too.
-   The ticket stays wide enough for a name, $297, and two 64px
-   buttons, so the three tabs have to share what's left. */
+   768-wide portrait is in this range. Phones are too. */
 @media (max-width: 900px) {
   .menu-grid,
   .menu-grid.is-few {
@@ -738,36 +737,49 @@ button {
   }
 }
 
-/* Portrait iPad: the ticket keeps the wide one-line row, so the
-   tabs share a narrower menu. Words stay inside the pills. */
-@media (max-width: 900px) and (min-width: 701px) {
-  .tabs {
-    gap: 6px;
+/* Portrait iPad. A 460px ticket beside the menu leaves only ~260px
+   for the snacks, so the tabs shrink and "Cheeseburger" breaks.
+   Put the menu on top and the ticket underneath instead. The ticket
+   is then the full width, so a name, $297, and two 64px buttons
+   still fit on one line, and there is room for four whole rows.
+   A short landscape phone is also under 900px wide. It stays side
+   by side, because the max-height: 500px rules come later and there
+   is not enough height to stack. */
+@media (max-width: 900px) and (min-height: 501px) {
+  .menu-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(160px, 1fr) minmax(540px, 0.72fr);
+    gap: 12px;
   }
 
-  .tab {
-    gap: 4px;
-    padding: 0 4px;
-    overflow: hidden;
-    font-size: 0.95rem;
+  .menu-grid,
+  .menu-grid.is-few {
+    grid-auto-rows: auto;
+    align-content: start;
   }
 
-  .tab .btn-icon {
-    font-size: 1rem;
+  .menu-item {
+    height: auto;
+    max-height: none;
   }
 
-  /* Two snack columns in a narrow menu. Keep the picture inside the card. */
+  /* Four 64px rows, plus the "More below" line, have to fit above Done.
+     A little less padding on the row is enough. The buttons stay 64px. */
+  .ticket-row {
+    padding: 1px 0 2px;
+  }
+
   .picture {
-    height: 72px;
+    height: 96px;
   }
 
   .emoji {
-    font-size: 56px;
+    font-size: 72px;
   }
 
   .picture img {
-    width: 72px;
-    height: 72px;
+    width: 96px;
+    height: 96px;
   }
 }
 
