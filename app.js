@@ -68,27 +68,90 @@
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
 
+  // A real word, with spaces trimmed off. A blank or an object is "".
+  function textOf(value) {
+    if (typeof value !== "string") {
+      return "";
+    }
+    return value.replace(/^\s+|\s+$/g, "");
+  }
+
+  // Ids are used in the code. Letters, numbers, and dashes only,
+  // so a quote cannot break the focus lookup.
+  function isSafeId(value) {
+    return /^[A-Za-z0-9-]+$/.test(value);
+  }
+
+  // Say what a bad menu.js value is, without printing [object Object].
+  function describeValue(value) {
+    if (value === undefined || value === null || value === "") {
+      return "nothing";
+    }
+    if (typeof value === "number") {
+      if (Number.isNaN(value)) {
+        return "not a number";
+      }
+      if (!Number.isFinite(value) || value > MAX_PRICE) {
+        return "too big";
+      }
+      return String(value);
+    }
+    if (typeof value === "string") {
+      var trimmed = textOf(value);
+      if (!trimmed) {
+        return "blank";
+      }
+      return '"' + trimmed + '"';
+    }
+    if (Array.isArray(value)) {
+      return "a list";
+    }
+    if (typeof value === "object") {
+      return "a group of values";
+    }
+    if (typeof value === "boolean") {
+      return value ? "yes" : "no";
+    }
+    return "something this page cannot use";
+  }
+
   // Name the snack by whatever menu.js actually filled in.
   function snackLabel(item, index, categoryLabel) {
-    if (item && item.name) {
-      return item.name;
+    var name = item && textOf(item.name);
+    if (name) {
+      return name;
     }
-    if (item && item.id) {
-      return item.id;
+    var id = item && textOf(item.id);
+    if (id) {
+      return id;
     }
     return "Snack " + (index + 1) + " in " + categoryLabel;
   }
 
+  // Read menu.js and hand back a cleaned copy. The file's own MENU
+  // object is left alone, so two categories cannot end up sharing
+  // one snacks list by accident.
   function prepareMenu() {
     var problems = [];
-    var keptCategories = [];
+    var cleaned = [];
+    var seenCategoryIds = {};
+    var seenLists = [];
+
+    // A typo never creates MENU. A missing file does not fire this flag.
+    // Every category being bad is handled later, with different words.
+    if (window.__menuJsError && !window.MENU) {
+      problems.push(
+        "menu.js has a typo, so it could not be read. Fix the typo, save, and refresh."
+      );
+      console.warn(problems[0]);
+      return { categories: cleaned, problems: problems, failed: "syntax" };
+    }
 
     // An object, null, or a missing list used to throw and leave a blank page.
-    // The same sentence as a missing menu.js, so the page still explains itself.
     if (!window.MENU || !Array.isArray(MENU.categories)) {
       problems.push("The menu did not load. Keep menu.js in the same folder as index.html.");
       console.warn(problems[0]);
-      return problems;
+      return { categories: cleaned, problems: problems, failed: "missing" };
     }
 
     MENU.categories.forEach(function (category, categoryIndex) {
@@ -99,23 +162,76 @@
         return;
       }
 
-      var kept = [];
-      var label = category.label || category.id || "Category " + (categoryIndex + 1);
+      var id = textOf(category.id);
+      var label = textOf(category.label);
+      // A missing label used to become the word "undefined" on the tab.
+      if (!id || !label) {
+        problems.push(
+          "Category " +
+            (categoryIndex + 1) +
+            " is hidden because it needs both a name and an id."
+        );
+        return;
+      }
+      if (!isSafeId(id)) {
+        problems.push(
+          "Category " +
+            (categoryIndex + 1) +
+            " is hidden because its id can only use letters, numbers, and dashes."
+        );
+        return;
+      }
+      if (seenCategoryIds[id]) {
+        problems.push(
+          label +
+            ' is hidden because another category already uses the id "' +
+            id +
+            '".'
+        );
+        return;
+      }
+
+      // The same array pasted into two categories would share snack objects.
+      var sharedWith = "";
+      var listIndex;
+      for (listIndex = 0; listIndex < seenLists.length; listIndex++) {
+        if (seenLists[listIndex].list === category.items) {
+          sharedWith = seenLists[listIndex].label;
+        }
+      }
+      if (sharedWith) {
+        problems.push(
+          label +
+            " is hidden because it uses the same snacks list as " +
+            sharedWith +
+            "."
+        );
+        return;
+      }
+
+      var copy = {
+        id: id,
+        label: label,
+        emoji: typeof category.emoji === "string" ? category.emoji : "",
+        items: []
+      };
 
       // No items key at all used to crash (undefined has no forEach).
-      // Treat that the same as an empty list, and say so.
       if (!Array.isArray(category.items)) {
         problems.push(
           label + " has no snacks list. In menu.js, add items: [ ] under that category."
         );
-        category.items = [];
-        keptCategories.push(category);
+        seenCategoryIds[id] = true;
+        cleaned.push(copy);
         return;
       }
 
+      seenLists.push({ list: category.items, label: label });
+
       if (category.items.length === 0) {
         problems.push(label + " has no snacks yet.");
-        keptCategories.push(category);
+        seenCategoryIds[id] = true;
+        cleaned.push(copy);
         return;
       }
 
@@ -126,57 +242,75 @@
           );
           return;
         }
-        if (!item.id || !item.name) {
+        var itemId = textOf(item.id);
+        var itemName = textOf(item.name);
+        if (!itemId || !itemName) {
           problems.push(
             snackLabel(item, itemIndex, label) +
               " is hidden because it needs both a name and an id."
           );
           return;
         }
-        if (itemsById[item.id]) {
+        if (!isSafeId(itemId)) {
           problems.push(
-            item.name +
-              " is hidden because another snack already uses the id \"" +
-              item.id +
-              "\". Give it a different id."
+            itemName +
+              " is hidden because its id can only use letters, numbers, and dashes."
           );
           return;
         }
-        var priceNote = priceProblem(item);
+        if (itemsById[itemId]) {
+          problems.push(
+            itemName +
+              ' is hidden because another snack already uses the id "' +
+              itemId +
+              '". Give it a different id.'
+          );
+          return;
+        }
+        var snack = {
+          id: itemId,
+          name: itemName,
+          price: item.price,
+          emoji: typeof item.emoji === "string" ? item.emoji : "",
+          image: typeof item.image === "string" ? item.image : ""
+        };
+        var priceNote = priceProblem(snack);
         if (priceNote) {
           problems.push(priceNote);
           return;
         }
-        itemsById[item.id] = item;
-        kept.push(item);
+        itemsById[itemId] = snack;
+        copy.items.push(snack);
       });
 
-      category.items = kept;
-      keptCategories.push(category);
+      seenCategoryIds[id] = true;
+      cleaned.push(copy);
     });
 
-    // Drop nulls so later loops can trust every entry.
-    MENU.categories = keptCategories;
+    // Every category was skipped. That is not the same as a missing file.
+    if (cleaned.length === 0) {
+      problems.unshift(
+        "Every category was skipped, so there is nothing to order. Fix menu.js, then save and refresh."
+      );
+      console.warn("Snack Shack menu notes:\n- " + problems.join("\n- "));
+      return { categories: cleaned, problems: problems, failed: "empty" };
+    }
 
     if (problems.length > 0) {
       console.warn("Snack Shack menu notes:\n- " + problems.join("\n- "));
     }
 
-    return problems;
+    return { categories: cleaned, problems: problems, failed: "" };
   }
 
   // Why a price was skipped, in words a parent can match to menu.js.
-  // A string "3" is shown with quotes, so it does not look like the number 3.
   function describePrice(price) {
-    if (typeof price === "string") {
-      return '"' + price + '"';
-    }
-    return String(price);
+    return describeValue(price);
   }
 
   function priceProblem(item) {
     var price = item.price;
-    var who = item.name || item.id || "A snack";
+    var who = textOf(item.name) || textOf(item.id) || "A snack";
     if (price === undefined || price === null || price === "") {
       return who + " is hidden because it has no price. Use a whole number like 3.";
     }
@@ -224,10 +358,22 @@
     var toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "menu-note-toggle";
-    toggle.textContent = "Check menu.js, then save and refresh.";
     toggle.setAttribute("aria-expanded", "false");
+    toggle.setAttribute("aria-controls", "menu-note-body");
+
+    // ▸ when closed, ▾ when open, so it is obvious the line opens.
+    var arrow = document.createElement("span");
+    arrow.className = "menu-note-arrow";
+    arrow.setAttribute("aria-hidden", "true");
+    arrow.textContent = "\u25B8";
+
+    var toggleLabel = document.createElement("span");
+    toggleLabel.textContent = "Check menu.js, then save and refresh.";
+    toggle.appendChild(arrow);
+    toggle.appendChild(toggleLabel);
 
     var body = document.createElement("div");
+    body.id = "menu-note-body";
     body.className = "menu-note-body";
     body.hidden = true;
 
@@ -241,6 +387,7 @@
       var open = body.hidden;
       body.hidden = !open;
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      arrow.textContent = open ? "\u25BE" : "\u25B8";
       fitTicketLines();
       updateScrollHint();
     });
@@ -416,6 +563,9 @@
     }
 
     var addedOne = next > current;
+    // A brand-new line should scroll into view. + on a snack
+    // that is already on the ticket leaves the scroll alone.
+    var isNewLine = addedOne && !state.quantities[id];
 
     if (next === 0) {
       delete state.quantities[id];
@@ -450,6 +600,23 @@
     }
 
     renderOrder();
+    if (isNewLine) {
+      revealTicketRow(id);
+      updateScrollHint();
+    }
+  }
+
+  // Bring a new ticket row on screen, but only if it is cut off.
+  // block: "nearest" does not jump when the row is already visible.
+  function revealTicketRow(id) {
+    var rows = ticketLinesEl.querySelectorAll(".ticket-row");
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute("data-id") === id) {
+        rows[i].scrollIntoView({ block: "nearest" });
+        return;
+      }
+    }
   }
 
   function clearOrder() {
@@ -725,6 +892,10 @@
       restoreAction = active.getAttribute("data-action") || "";
     }
 
+    // Rebuilding used to jump back to the top. Keep the place
+    // the kid had scrolled to, unless a new snack asks to be seen.
+    var savedScroll = ticketLinesEl.scrollTop;
+
     ticketLinesEl.innerHTML = "";
 
     if (state.addedIds.length === 0) {
@@ -743,6 +914,10 @@
     // Done stays quiet until there is something to summarize.
     doneButton.disabled = state.addedIds.length === 0;
 
+    if (savedScroll > 0) {
+      ticketLinesEl.scrollTop = savedScroll;
+    }
+
     if (restoreId && restoreAction) {
       restoreTicketFocus(restoreId, restoreAction);
     }
@@ -753,16 +928,26 @@
 
   // Put keyboard focus back after the ticket is rebuilt.
   // A disabled + cannot hold focus, and neither can a deleted row.
+  // Match the button by its data, not by pasting the id into a selector.
+  // An id with a quote used to throw and blank the page.
+  function findTicketButton(id, action) {
+    var buttons = ticketLinesEl.querySelectorAll("button");
+    var i;
+    for (i = 0; i < buttons.length; i++) {
+      var button = buttons[i];
+      if (button.getAttribute("data-id") === id && button.getAttribute("data-action") === action) {
+        return button;
+      }
+    }
+    return null;
+  }
+
   function restoreTicketFocus(id, action) {
-    var button = ticketLinesEl.querySelector(
-      'button[data-id="' + id + '"][data-action="' + action + '"]'
-    );
+    var button = findTicketButton(id, action);
 
     // + just hit 99 and is now disabled. Land on that row's −.
     if (button && button.disabled) {
-      button = ticketLinesEl.querySelector(
-        'button[data-id="' + id + '"][data-action="minus"]'
-      );
+      button = findTicketButton(id, "minus");
     }
 
     // The row is gone (quantity hit 0). Move to a button that is left.
@@ -818,49 +1003,6 @@
     if (room - used > 1) {
       ticketLinesEl.style.maxHeight = used + "px";
     }
-    alignTicketScroll();
-  }
-
-  // A scroll can stop between two rows and cut a + / − in half.
-  // Land on the nearest row start instead. Called after the scroll
-  // settles, so a finger can still drag.
-  var ticketSnapTimer = 0;
-  var aligningTicket = false;
-
-  function alignTicketScroll() {
-    if (aligningTicket || menuScreen.hidden) {
-      return;
-    }
-    var rows = ticketLinesEl.querySelectorAll(".ticket-row");
-    if (!rows.length) {
-      return;
-    }
-    var scrollTop = ticketLinesEl.scrollTop;
-    if (scrollTop < 1) {
-      return;
-    }
-    var maxScroll = ticketLinesEl.scrollHeight - ticketLinesEl.clientHeight;
-    var portTop = ticketLinesEl.getBoundingClientRect().top;
-    var best = 0;
-    var bestDist = Math.abs(scrollTop);
-    var i;
-    for (i = 0; i < rows.length; i++) {
-      var y = scrollTop + (rows[i].getBoundingClientRect().top - portTop);
-      if (y > maxScroll + 1) {
-        break;
-      }
-      var dist = Math.abs(y - scrollTop);
-      if (dist < bestDist) {
-        bestDist = dist;
-        best = y;
-      }
-    }
-    if (Math.abs(scrollTop - best) < 1) {
-      return;
-    }
-    aligningTicket = true;
-    ticketLinesEl.scrollTop = best;
-    aligningTicket = false;
   }
 
   // "More below" when a list is taller than the space it has.
@@ -886,6 +1028,7 @@
   function makeTicketRow(item, quantity) {
     var row = document.createElement("div");
     row.className = "ticket-row";
+    row.setAttribute("data-id", item.id);
 
     // Name, with the each-price tucked under it when the row has room.
     var main = document.createElement("div");
@@ -981,18 +1124,15 @@
   // Wire-up
   // ----------------------------------------------------------
 
-  function showSetupProblem(message) {
-    var note = document.createElement("p");
-    note.className = "noscript";
-    note.textContent = message;
-    document.body.insertBefore(note, document.body.firstChild);
-  }
-
   function init() {
-    var problems = prepareMenu();
-    if (!window.MENU || !Array.isArray(MENU.categories) || MENU.categories.length === 0) {
-      showSetupProblem("The menu did not load. Keep menu.js in the same folder as index.html.");
-      showMenuNotes(problems);
+    var prepared = prepareMenu();
+    // Swap in the cleaned copy. menu.js itself is not rewritten.
+    window.MENU = { categories: prepared.categories };
+
+    if (prepared.failed) {
+      // One sentence, in the yellow note. A second copy used to
+      // sit at the top of the page as well.
+      showMenuNotes(prepared.problems);
       return;
     }
 
@@ -1042,11 +1182,10 @@
       say(soundMuted ? "Sound off." : "Sound on.");
     });
 
-    ticketLinesEl.addEventListener("scroll", function () {
-      updateScrollHint();
-      window.clearTimeout(ticketSnapTimer);
-      ticketSnapTimer = window.setTimeout(alignTicketScroll, 60);
-    });
+    // CSS scroll-snap lands on a row after a finger lifts.
+    // Do not move scrollTop from here. That jumped the list
+    // while a finger was still down.
+    ticketLinesEl.addEventListener("scroll", updateScrollHint);
     summaryLinesEl.addEventListener("scroll", updateScrollHint);
     window.addEventListener("resize", function () {
       fitTicketLines();
@@ -1061,7 +1200,7 @@
     }
 
     // Yellow note when a price or id was skipped. Hidden when the menu is fine.
-    showMenuNotes(problems);
+    showMenuNotes(prepared.problems);
 
     renderTabs();
     renderMenuGrid();

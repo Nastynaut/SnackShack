@@ -160,10 +160,14 @@ button:focus-visible {
 /* Starts as one line so a short landscape iPad still fits four rows.
    Tap it to read the rest. */
 .menu-note-toggle {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   margin: 0;
-  padding: 8px 14px;
+  /* At least 48px, so a parent can hit it. */
+  min-height: 48px;
+  padding: 10px 14px;
   border: 0;
   border-radius: 12px;
   background: transparent;
@@ -175,7 +179,18 @@ button:focus-visible {
   text-align: left;
 }
 
+.menu-note-arrow {
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
 .menu-note-body {
+  /* A long list of problems scrolls inside the note, so it
+     cannot push the snacks or Done off the screen. */
+  max-height: 120px;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 0 14px 10px;
 }
 
@@ -453,7 +468,6 @@ button {
   padding: 4px 0 6px;
   border-bottom: 3px dashed var(--cream-deep);
   scroll-snap-align: start;
-  scroll-snap-stop: always;
 }
 
 .line-main {

@@ -107,7 +107,17 @@
     <p class="noscript">Turn on JavaScript to use Snack Shack. It still works with no internet.</p>
   </noscript>
 
-  <!-- menu.js must come first. It creates the MENU list that app.js reads. -->
+  <!-- menu.js must come first. It creates the MENU list that app.js reads.
+       A typo never creates MENU. Remember that, so the page can say
+       "typo" instead of "every category was skipped". -->
+  <script>
+    window.__menuJsError = false;
+    // file:// hides the real message ("Script error."), so this only
+    // remembers that menu.js failed. app.js checks it before MENU exists.
+    window.addEventListener("error", function () {
+      window.__menuJsError = true;
+    });
+  </script>
   <script src="menu.js"></script>
   <script src="app.js"></script>
 </body>
