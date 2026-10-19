@@ -42,6 +42,12 @@ Contrast (WCAG AA, computed):
 | `#2B1D3A` on `#FFF0D6` (text / surface-alt) | 13.95:1 | PASS |
 | `#5E4F6E` on `#FFF8EC` (text-muted / background) | 7.05:1 | PASS |
 | `#5E4F6E` on `#FFFFFF` (text-muted / surface) | 7.45:1 | PASS |
+| `#5E4F6E` on `#FFF0D6` (text-muted / surface-alt) | 6.63:1 | PASS |
+| `#B23C0C` on `#FFF0D6` (primary-ink / surface-alt) | 5.27:1 | PASS |
+| `#0B6694` on `#FFF0D6` (secondary-ink / surface-alt) | 5.59:1 | PASS |
+| `#1D7A36` on `#FFF0D6` (success-ink / surface-alt) | 4.80:1 | PASS |
+| `#B3202A` on `#FFF0D6` (danger-ink / surface-alt) | 5.92:1 | PASS |
+| `#5C5266` on `#FFF0D6` (disabled-text / surface-alt) | 6.55:1 | PASS |
 | `#2B1D3A` on `#FF7A45` (text-on-color / primary) | 6.06:1 | PASS |
 | `#2B1D3A` on `#3DB8F5` (text-on-color / secondary) | 7.0:1 | PASS |
 | `#2B1D3A` on `#FFD23F` (text-on-color / accent) | 10.86:1 | PASS |

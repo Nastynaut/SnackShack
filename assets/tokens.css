@@ -1,5 +1,5 @@
 @import url('fonts/fonts.css');
-/* Snack Shack design tokens — generated; keep in sync with tokens.json */
+/* Snack Shack design tokens */
 :root {
   /* color */
   --color-primary: #FF7A45;
@@ -36,7 +36,7 @@
   --font-size-3xl: 56px;
   /* fontWeight */
   --font-weight-body: 400;
-  --font-weight-bodyBold: 700;
+  --font-weight-body-bold: 700;
   --font-weight-heading: 600;
   --font-weight-display: 700;
   /* lineHeight */
@@ -80,6 +80,7 @@
    text #2B1D3A on surface-alt #FFF0D6: 13.95:1 PASS (text (4.5:1))
    text-muted #5E4F6E on background #FFF8EC: 7.05:1 PASS (text (4.5:1))
    text-muted #5E4F6E on surface #FFFFFF: 7.45:1 PASS (text (4.5:1))
+   text-muted #5E4F6E on surface-alt #FFF0D6: 6.63:1 PASS (text (4.5:1))
    text-on-color #2B1D3A on primary #FF7A45: 6.06:1 PASS (text (4.5:1))
    text-on-color #2B1D3A on secondary #3DB8F5: 7.0:1 PASS (text (4.5:1))
    text-on-color #2B1D3A on accent #FFD23F: 10.86:1 PASS (text (4.5:1))
@@ -91,6 +92,7 @@
    text-on-color #2B1D3A on drinks #3DB8F5: 7.0:1 PASS (text (4.5:1))
    text-on-color #2B1D3A on desserts #FF8FC0: 7.42:1 PASS (text (4.5:1))
    disabled-text #5C5266 on disabled-bg #E6E1EA: 5.72:1 PASS (text (4.5:1))
+   disabled-text #5C5266 on surface-alt #FFF0D6: 6.55:1 PASS (text (4.5:1))
    primary-ink #B23C0C on background #FFF8EC: 5.61:1 PASS (text (4.5:1))
    secondary-ink #0B6694 on background #FFF8EC: 5.95:1 PASS (text (4.5:1))
    success-ink #1D7A36 on background #FFF8EC: 5.11:1 PASS (text (4.5:1))
@@ -99,6 +101,10 @@
    secondary-ink #0B6694 on surface #FFFFFF: 6.28:1 PASS (text (4.5:1))
    success-ink #1D7A36 on surface #FFFFFF: 5.4:1 PASS (text (4.5:1))
    danger-ink #B3202A on surface #FFFFFF: 6.65:1 PASS (text (4.5:1))
+   primary-ink #B23C0C on surface-alt #FFF0D6: 5.27:1 PASS (text (4.5:1))
+   secondary-ink #0B6694 on surface-alt #FFF0D6: 5.59:1 PASS (text (4.5:1))
+   success-ink #1D7A36 on surface-alt #FFF0D6: 4.80:1 PASS (text (4.5:1))
+   danger-ink #B3202A on surface-alt #FFF0D6: 5.92:1 PASS (text (4.5:1))
    outline #2B1D3A on background #FFF8EC: 14.85:1 PASS (non-text (3:1))
    focus-ring #7C4DFF on background #FFF8EC: 4.56:1 PASS (non-text (3:1))
 */
