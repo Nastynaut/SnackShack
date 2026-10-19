@@ -1,0 +1,588 @@
+/* ============================================================
+   SNACK SHACK LOOK
+   ============================================================
+   This file is the whole design. The page still looks finished
+   if assets/tokens.css and assets/buttons.css are not here yet.
+
+   When tokens.css IS here, the var(--color-..., fallback) lines
+   pick up its palette. Our fallback colors match that palette,
+   so nothing jumps when the file arrives.
+
+   Built for a tablet held sideways (about 1024x768 or 1280x800).
+   Big targets, dark ink on bright fills, no internet fonts.
+*/
+
+:root {
+  --ink: var(--color-text, #2b1d3a);
+  --muted: var(--color-text-muted, #5e4f6e);
+  --paper: var(--color-surface, #ffffff);
+  --cream: var(--color-background, #fff8ec);
+  --cream-deep: var(--color-surface-alt, #fff0d6);
+  --orange: var(--color-primary, #ff7a45);
+  --blue: var(--color-drinks, #3db8f5);
+  --yellow: var(--color-accent, #ffd23f);
+  --green: var(--color-success, #3fbf5f);
+  --pink: var(--color-desserts, #ff8fc0);
+  --red: var(--color-danger, #f2545b);
+  --outline: var(--color-outline, #2b1d3a);
+  --focus: var(--color-focus-ring, #7c4dff);
+  --disabled-bg: var(--color-disabled-bg, #e6e1ea);
+  --disabled-text: var(--color-disabled-text, #5c5266);
+  --font-ui: var(--font-body, "Trebuchet MS", "Segoe UI", Verdana, "Noto Sans", sans-serif);
+  --font-sign: var(--font-heading, Georgia, "Liberation Serif", "Times New Roman", serif);
+  --chunky: var(--shadow-chunky, 0 6px 0 #2b1d3a);
+  --chunky-pressed: var(--shadow-chunky-pressed, 0 2px 0 #2b1d3a);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  /* Three bands: awning, title, then whichever screen is open. */
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--cream);
+  font-family: var(--font-ui);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+button {
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  /* Stops a double-tap on a tablet from zooming the page. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible {
+  outline: 5px solid var(--focus);
+  outline-offset: 4px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Orange-and-yellow shop awning. */
+.awning {
+  height: 18px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--orange) 0 36px,
+    var(--yellow) 36px 72px
+  );
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 20px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.mute-button {
+  flex: none;
+  min-height: 64px;
+  padding: 0 22px;
+  border: 4px solid var(--outline);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-size: 1.2rem;
+  font-weight: 700;
+}
+
+.mute-button[aria-pressed="true"] {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  box-shadow: none;
+}
+
+.mute-button:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+/* ----------------------------------------------------------------
+   Screen 1: menu + ticket
+---------------------------------------------------------------- */
+
+.menu-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  padding: 4px 16px 14px;
+  min-height: 0;
+}
+
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  flex: 1;
+  min-height: 64px;
+  border: 4px solid var(--outline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.tab:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+/* Each tab has its own fill so Food / Drinks / Treats
+   are not told apart by color alone — the word is still on the tab. */
+.tab.is-selected[data-category="food"] {
+  background: var(--orange);
+}
+
+.tab.is-selected[data-category="drinks"] {
+  background: var(--blue);
+}
+
+.tab.is-selected[data-category="treats"] {
+  background: var(--pink);
+}
+
+.menu-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+  overflow: auto;
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  max-height: 320px;
+  padding: 8px 8px 12px;
+  border: 4px solid var(--outline);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+  user-select: none;
+}
+
+.menu-item:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.menu-item.is-on-ticket {
+  background: var(--cream-deep);
+}
+
+/* Emoji and the designer's SVG share one box.
+   Whichever is hidden gets out of the way. */
+.picture {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: clamp(96px, 14vh, 120px);
+}
+
+.picture > * {
+  grid-area: 1 / 1;
+}
+
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: clamp(64px, 10vh, 92px);
+  line-height: 1;
+}
+
+.picture img {
+  width: clamp(96px, 14vh, 120px);
+  height: clamp(96px, 14vh, 120px);
+  object-fit: contain;
+}
+
+.item-name {
+  font-family: var(--font-sign);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.item-price {
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 3px solid var(--outline);
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.ticket,
+.summary-card {
+  border: 4px solid var(--outline);
+  border-radius: 28px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+}
+
+.ticket {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 14px 16px 14px;
+}
+
+.ticket-title,
+.summary-heading h2 {
+  margin: 0;
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.ticket-lines {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.ticket-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 1.3rem;
+  text-align: center;
+}
+
+.ticket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 3px dashed var(--cream-deep);
+}
+
+.line-name {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.line-each {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.line-price {
+  font-size: 1.4rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  grid-column: 1 / -1;
+}
+
+.qty-button {
+  width: 64px;
+  height: 64px;
+  border: 4px solid var(--outline);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-size: 2.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.qty-minus {
+  background: var(--red);
+}
+
+.qty-plus {
+  background: var(--green);
+}
+
+.qty-button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.qty-button:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.qty-number {
+  min-width: 2ch;
+  font-size: 1.8rem;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-footer {
+  padding-top: 8px;
+}
+
+.total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  font-family: var(--font-sign);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.total-row strong {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.done-button,
+.edit-button,
+.new-button {
+  width: 100%;
+  min-height: 64px;
+  border: 4px solid var(--outline);
+  border-radius: 20px;
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.done-button {
+  min-height: 88px;
+  background: var(--yellow);
+  font-size: 2rem;
+}
+
+.done-button:active:not(:disabled),
+.edit-button:active,
+.new-button:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.done-button:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.edit-button {
+  background: var(--paper);
+}
+
+.new-button {
+  background: var(--orange);
+}
+
+/* ----------------------------------------------------------------
+   Screen 2: summary
+---------------------------------------------------------------- */
+
+.summary-screen {
+  min-height: 0;
+  padding: 4px 20px 14px;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 16px 28px 16px;
+}
+
+.summary-count {
+  margin: 2px 0 8px;
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+
+.summary-columns,
+.summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.summary-columns {
+  padding: 0 4px 6px;
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.summary-columns span:nth-child(n + 2),
+.summary-row span:nth-child(n + 2) {
+  text-align: right;
+}
+
+.summary-lines {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.summary-row {
+  padding: 12px 4px;
+  border-top: 3px dashed var(--cream-deep);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.summary-row .summary-price,
+.summary-total strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 4px solid var(--outline);
+}
+
+.summary-total strong {
+  font-size: 4rem;
+}
+
+.summary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.noscript {
+  margin: 16px;
+  font-size: 1.3rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-item:active,
+  .tab:active,
+  .qty-button:active,
+  .done-button:active,
+  .edit-button:active,
+  .new-button:active,
+  .mute-button:active {
+    transform: none;
+  }
+}
+
+/* A wider tablet gets a slightly wider ticket. */
+@media (min-width: 1200px) {
+  .menu-screen {
+    grid-template-columns: minmax(0, 1fr) 400px;
+    gap: 20px;
+    padding: 6px 20px 18px;
+  }
+
+  .item-name {
+    font-size: 1.45rem;
+  }
+}

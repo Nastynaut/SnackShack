@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Snack Shack</title>
+  <!-- Our own stylesheet is the whole look. It does not load anything from the internet. -->
+  <link rel="stylesheet" href="styles.css">
+  <!--
+    Optional designer files. If they are not in the folder yet, the browser
+    skips them and styles.css still covers the page.
+    tokens.css  — palette (colors, type, spacing)
+    buttons.css — extra styles for buttons that use the .btn classes
+    Load tokens first so buttons.css can use those colors.
+  -->
+  <link rel="stylesheet" href="assets/tokens.css">
+  <link rel="stylesheet" href="assets/buttons.css">
+</head>
+<body>
+  <div class="awning" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <h1>Snack Shack</h1>
+      <p class="tagline">One of you runs the register. One of you orders.</p>
+    </div>
+    <button type="button" id="mute-button" class="mute-button btn btn--secondary" aria-pressed="false">Sound on</button>
+  </header>
+
+  <!-- Screen 1: pick snacks. The ticket on the right is the order. -->
+  <main id="menu-screen" class="menu-screen">
+    <section class="menu-panel">
+      <div id="category-tabs" class="tabs" role="tablist" aria-label="Menu categories"></div>
+      <div id="menu-grid" class="menu-grid" role="tabpanel"></div>
+    </section>
+
+    <aside class="ticket" aria-label="Order ticket">
+      <h2 class="ticket-title">Ticket</h2>
+      <div id="ticket-lines" class="ticket-lines"></div>
+      <div class="ticket-footer">
+        <p class="total-row">
+          <span>Total</span>
+          <strong id="ticket-total">$0</strong>
+        </p>
+        <button type="button" id="done-button" class="done-button btn btn--checkout" disabled>Done</button>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Screen 2: read the order back. Hidden until Done is tapped. -->
+  <main id="summary-screen" class="summary-screen" hidden>
+    <section class="summary-card">
+      <header class="summary-heading">
+        <h2>Here's the order</h2>
+        <p id="summary-count" class="summary-count"></p>
+      </header>
+      <div class="summary-columns" aria-hidden="true">
+        <span>Item</span>
+        <span>How many</span>
+        <span>Price</span>
+      </div>
+      <div id="summary-lines" class="summary-lines"></div>
+      <p class="total-row summary-total">
+        <span>Total</span>
+        <strong id="summary-total">$0</strong>
+      </p>
+      <div class="summary-actions">
+        <button type="button" id="edit-order" class="edit-button btn btn--secondary">Edit Order</button>
+        <button type="button" id="new-order" class="new-button btn btn--primary">New Order</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Screen readers hear this when the order changes. It is not shown. -->
+  <p id="live-status" class="visually-hidden" aria-live="polite"></p>
+
+  <noscript>
+    <p class="noscript">Turn on JavaScript to use Snack Shack. It still works with no internet.</p>
+  </noscript>
+
+  <!-- menu.js must come first. It creates the MENU list that app.js reads. -->
+  <script src="menu.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
