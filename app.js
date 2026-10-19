@@ -62,18 +62,45 @@
   // Build itemsById once. A bad price or a repeated id is skipped
   // so the total cannot go wrong. We say why on the page and in
   // the console, so a menu edit is easy to spot.
+  // null is not a usable record. Arrays are objects too, but a category
+  // or a snack is always a plain { } in menu.js.
+  function isRecord(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  // Name the snack by whatever menu.js actually filled in.
+  function snackLabel(item, index, categoryLabel) {
+    if (item && item.name) {
+      return item.name;
+    }
+    if (item && item.id) {
+      return item.id;
+    }
+    return "Snack " + (index + 1) + " in " + categoryLabel;
+  }
+
   function prepareMenu() {
     var problems = [];
+    var keptCategories = [];
 
-    if (!window.MENU || !MENU.categories) {
-      problems.push("menu.js did not load. Keep it in the same folder as index.html.");
+    // An object, null, or a missing list used to throw and leave a blank page.
+    // The same sentence as a missing menu.js, so the page still explains itself.
+    if (!window.MENU || !Array.isArray(MENU.categories)) {
+      problems.push("The menu did not load. Keep menu.js in the same folder as index.html.");
       console.warn(problems[0]);
       return problems;
     }
 
-    MENU.categories.forEach(function (category) {
+    MENU.categories.forEach(function (category, categoryIndex) {
+      if (!isRecord(category)) {
+        problems.push(
+          "Category " + (categoryIndex + 1) + " is hidden because it is not a category."
+        );
+        return;
+      }
+
       var kept = [];
-      var label = category.label || "A category";
+      var label = category.label || category.id || "Category " + (categoryIndex + 1);
 
       // No items key at all used to crash (undefined has no forEach).
       // Treat that the same as an empty list, and say so.
@@ -82,17 +109,28 @@
           label + " has no snacks list. In menu.js, add items: [ ] under that category."
         );
         category.items = [];
+        keptCategories.push(category);
         return;
       }
 
       if (category.items.length === 0) {
         problems.push(label + " has no snacks yet.");
+        keptCategories.push(category);
         return;
       }
 
-      category.items.forEach(function (item) {
+      category.items.forEach(function (item, itemIndex) {
+        if (!isRecord(item)) {
+          problems.push(
+            snackLabel(item, itemIndex, label) + " is hidden because it is not a snack."
+          );
+          return;
+        }
         if (!item.id || !item.name) {
-          problems.push("One snack is hidden because it needs both a name and an id.");
+          problems.push(
+            snackLabel(item, itemIndex, label) +
+              " is hidden because it needs both a name and an id."
+          );
           return;
         }
         if (itemsById[item.id]) {
@@ -114,7 +152,11 @@
       });
 
       category.items = kept;
+      keptCategories.push(category);
     });
+
+    // Drop nulls so later loops can trust every entry.
+    MENU.categories = keptCategories;
 
     if (problems.length > 0) {
       console.warn("Snack Shack menu notes:\n- " + problems.join("\n- "));
@@ -134,14 +176,31 @@
 
   function priceProblem(item) {
     var price = item.price;
+    var who = item.name || item.id || "A snack";
     if (price === undefined || price === null || price === "") {
-      return item.name + " is hidden because it has no price. Use a whole number like 3.";
+      return who + " is hidden because it has no price. Use a whole number like 3.";
     }
-    // Number.isInteger rejects 2.5, NaN, and the string "3".
-    // Anything over MAX_PRICE would print like $1e+21.
-    if (typeof price !== "number" || !Number.isInteger(price) || price < 0 || price > MAX_PRICE) {
+    // NaN would print as the word NaN. Say what is wrong instead.
+    if (typeof price === "number" && Number.isNaN(price)) {
+      return who + " is hidden because its price is not a number. Use a whole number from 0 to 999.";
+    }
+    // A string "3" is shown with quotes, so it does not look like the number 3.
+    if (typeof price !== "number") {
       return (
-        item.name +
+        who +
+        " is hidden because its price is " +
+        describePrice(price) +
+        ". Use a whole number from 0 to 999."
+      );
+    }
+    // Anything over MAX_PRICE would print like $1e+21.
+    if (price > MAX_PRICE) {
+      return who + " is hidden because its price is too big. Use a whole number from 0 to 999.";
+    }
+    // Number.isInteger also rejects 2.5 and negatives.
+    if (!Number.isInteger(price) || price < 0) {
+      return (
+        who +
         " is hidden because its price is " +
         describePrice(price) +
         ". Use a whole number from 0 to 999."
@@ -160,17 +219,34 @@
       return;
     }
 
-    var title = document.createElement("p");
-    title.className = "menu-note-title";
-    title.textContent = "Check menu.js, then save and refresh.";
-    note.appendChild(title);
+    // One line until it is opened. A tall note was hiding a ticket row
+    // on a short landscape iPad.
+    var toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "menu-note-toggle";
+    toggle.textContent = "Check menu.js, then save and refresh.";
+    toggle.setAttribute("aria-expanded", "false");
+
+    var body = document.createElement("div");
+    body.className = "menu-note-body";
+    body.hidden = true;
 
     for (var i = 0; i < problems.length; i++) {
       var line = document.createElement("p");
       line.textContent = problems[i];
-      note.appendChild(line);
+      body.appendChild(line);
     }
 
+    toggle.addEventListener("click", function () {
+      var open = body.hidden;
+      body.hidden = !open;
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      fitTicketLines();
+      updateScrollHint();
+    });
+
+    note.appendChild(toggle);
+    note.appendChild(body);
     note.hidden = false;
   }
 
@@ -415,6 +491,13 @@
       }
     } else {
       document.getElementById("summary-heading").focus({ preventScroll: true });
+    }
+
+    // Coming back from the summary used to keep a half-cut scroll.
+    // Reset after the screen is visible, so the browser does not
+    // restore the old position while the menu was hidden.
+    if (onMenu) {
+      ticketLinesEl.scrollTop = 0;
     }
 
     // The summary was hidden while we measured it. Check the hint now.
@@ -735,6 +818,49 @@
     if (room - used > 1) {
       ticketLinesEl.style.maxHeight = used + "px";
     }
+    alignTicketScroll();
+  }
+
+  // A scroll can stop between two rows and cut a + / − in half.
+  // Land on the nearest row start instead. Called after the scroll
+  // settles, so a finger can still drag.
+  var ticketSnapTimer = 0;
+  var aligningTicket = false;
+
+  function alignTicketScroll() {
+    if (aligningTicket || menuScreen.hidden) {
+      return;
+    }
+    var rows = ticketLinesEl.querySelectorAll(".ticket-row");
+    if (!rows.length) {
+      return;
+    }
+    var scrollTop = ticketLinesEl.scrollTop;
+    if (scrollTop < 1) {
+      return;
+    }
+    var maxScroll = ticketLinesEl.scrollHeight - ticketLinesEl.clientHeight;
+    var portTop = ticketLinesEl.getBoundingClientRect().top;
+    var best = 0;
+    var bestDist = Math.abs(scrollTop);
+    var i;
+    for (i = 0; i < rows.length; i++) {
+      var y = scrollTop + (rows[i].getBoundingClientRect().top - portTop);
+      if (y > maxScroll + 1) {
+        break;
+      }
+      var dist = Math.abs(y - scrollTop);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = y;
+      }
+    }
+    if (Math.abs(scrollTop - best) < 1) {
+      return;
+    }
+    aligningTicket = true;
+    ticketLinesEl.scrollTop = best;
+    aligningTicket = false;
   }
 
   // "More below" when a list is taller than the space it has.
@@ -864,8 +990,9 @@
 
   function init() {
     var problems = prepareMenu();
-    if (!window.MENU || !MENU.categories || MENU.categories.length === 0) {
+    if (!window.MENU || !Array.isArray(MENU.categories) || MENU.categories.length === 0) {
       showSetupProblem("The menu did not load. Keep menu.js in the same folder as index.html.");
+      showMenuNotes(problems);
       return;
     }
 
@@ -915,7 +1042,11 @@
       say(soundMuted ? "Sound off." : "Sound on.");
     });
 
-    ticketLinesEl.addEventListener("scroll", updateScrollHint);
+    ticketLinesEl.addEventListener("scroll", function () {
+      updateScrollHint();
+      window.clearTimeout(ticketSnapTimer);
+      ticketSnapTimer = window.setTimeout(alignTicketScroll, 60);
+    });
     summaryLinesEl.addEventListener("scroll", updateScrollHint);
     window.addEventListener("resize", function () {
       fitTicketLines();
