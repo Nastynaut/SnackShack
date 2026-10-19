@@ -1,0 +1,44 @@
+/* Snack Shack buttons. Requires tokens.css. Big, rounded, chunky, tablet-friendly. */
+.btn {
+  --btn-bg: var(--color-primary);
+  --btn-fg: var(--color-text-on-color);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-3);
+  min-height: var(--size-tap-min); min-width: var(--size-tap-min);
+  padding: var(--space-3) var(--space-6);
+  font-family: var(--font-heading); font-weight: 600; font-size: var(--font-size-lg); line-height: 1;
+  color: var(--btn-fg); background: var(--btn-bg);
+  border: var(--border-width) solid var(--color-outline);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-chunky);
+  cursor: pointer; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  transition: transform .08s ease, box-shadow .08s ease, filter .12s ease;
+}
+.btn img, .btn svg { width: 40px; height: 40px; flex: none; }
+.btn:hover { filter: brightness(1.05); }
+.btn:active, .btn.is-pressed { transform: translateY(4px); box-shadow: var(--shadow-chunky-pressed); }
+.btn:focus-visible { outline: 5px solid var(--color-focus-ring); outline-offset: 4px; }
+
+.btn--primary   { --btn-bg: var(--color-primary); }
+.btn--secondary { --btn-bg: var(--color-surface); }
+.btn--add       { --btn-bg: var(--color-success); }
+.btn--remove    { --btn-bg: var(--color-danger); }
+.btn--checkout  {
+  --btn-bg: var(--color-accent);
+  min-height: var(--size-tap-big); width: 100%; max-width: 480px;
+  font-size: var(--font-size-xl); font-weight: 700; border-radius: var(--radius-lg);
+}
+.btn--checkout img, .btn--checkout svg { width: 56px; height: 56px; }
+
+/* Round icon-only button (e.g. +/- on the order ticket). Always give it aria-label. */
+.btn--icon { padding: 0; width: var(--size-tap-min); height: var(--size-tap-min); border-radius: 50%; }
+.btn--icon img, .btn--icon svg { width: 44px; height: 44px; }
+
+.btn:disabled, .btn[aria-disabled="true"] {
+  --btn-bg: var(--color-disabled-bg); --btn-fg: var(--color-disabled-text);
+  border-color: var(--color-disabled-text); border-style: dashed;
+  box-shadow: none; transform: none; filter: none; cursor: not-allowed;
+}
+.btn:disabled img, .btn[aria-disabled="true"] img { filter: grayscale(1); opacity: .5; }
+
+@media (prefers-reduced-motion: reduce) { .btn { transition: none; } .btn:active { transform: none; } }

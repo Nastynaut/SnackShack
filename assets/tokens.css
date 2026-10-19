@@ -1,0 +1,103 @@
+/* Snack Shack design tokens — generated; keep in sync with tokens.json */
+:root {
+  /* color */
+  --color-primary: #FF7A45;
+  --color-primary-ink: #B23C0C;
+  --color-secondary: #3DB8F5;
+  --color-secondary-ink: #0B6694;
+  --color-accent: #FFD23F;
+  --color-success: #3FBF5F;
+  --color-success-ink: #1D7A36;
+  --color-warning: #FFB020;
+  --color-danger: #F2545B;
+  --color-danger-ink: #B3202A;
+  --color-background: #FFF8EC;
+  --color-surface: #FFFFFF;
+  --color-surface-alt: #FFF0D6;
+  --color-text: #2B1D3A;
+  --color-text-muted: #5E4F6E;
+  --color-text-on-color: #2B1D3A;
+  --color-outline: #2B1D3A;
+  --color-focus-ring: #7C4DFF;
+  --color-disabled-bg: #E6E1EA;
+  --color-disabled-text: #5C5266;
+  --color-mains: #FF7A45;
+  --color-sides: #FFC93C;
+  --color-drinks: #3DB8F5;
+  --color-desserts: #FF8FC0;
+  /* fontSize */
+  --font-size-xs: 16px;
+  --font-size-sm: 18px;
+  --font-size-md: 20px;
+  --font-size-lg: 24px;
+  --font-size-xl: 32px;
+  --font-size-2xl: 40px;
+  --font-size-3xl: 56px;
+  /* fontWeight */
+  --font-weight-body: 400;
+  --font-weight-bodyBold: 700;
+  --font-weight-heading: 600;
+  --font-weight-display: 700;
+  /* lineHeight */
+  --line-height-tight: 1.15;
+  --line-height-normal: 1.4;
+  /* space */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  /* radius */
+  --radius-sm: 12px;
+  --radius-md: 20px;
+  --radius-lg: 28px;
+  --radius-pill: 999px;
+  /* border */
+  --border-width: 4px;
+  /* shadow */
+  --shadow-chunky: 0 6px 0 #2B1D3A;
+  --shadow-chunky-pressed: 0 2px 0 #2B1D3A;
+  --shadow-card: 0 6px 0 rgba(43,29,58,.15);
+  /* size */
+  --size-tap-min: 64px;
+  --size-tap-big: 88px;
+  --size-icon-sm: 48px;
+  --size-icon-md: 64px;
+  --size-icon-lg: 96px;
+  --size-icon-xl: 128px;
+  --font-heading: 'Fredoka', 'Nunito', system-ui, sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+  --sound-volume: 0.6;
+}
+
+/* WCAG contrast (computed):
+   text #2B1D3A on background #FFF8EC: 14.85:1 PASS (text (4.5:1))
+   text #2B1D3A on surface #FFFFFF: 15.68:1 PASS (text (4.5:1))
+   text #2B1D3A on surface-alt #FFF0D6: 13.95:1 PASS (text (4.5:1))
+   text-muted #5E4F6E on background #FFF8EC: 7.05:1 PASS (text (4.5:1))
+   text-muted #5E4F6E on surface #FFFFFF: 7.45:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on primary #FF7A45: 6.06:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on secondary #3DB8F5: 7.0:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on accent #FFD23F: 10.86:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on success #3FBF5F: 6.59:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on warning #FFB020: 8.57:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on danger #F2545B: 4.62:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on mains #FF7A45: 6.06:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on sides #FFC93C: 10.21:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on drinks #3DB8F5: 7.0:1 PASS (text (4.5:1))
+   text-on-color #2B1D3A on desserts #FF8FC0: 7.42:1 PASS (text (4.5:1))
+   disabled-text #5C5266 on disabled-bg #E6E1EA: 5.72:1 PASS (text (4.5:1))
+   primary-ink #B23C0C on background #FFF8EC: 5.61:1 PASS (text (4.5:1))
+   secondary-ink #0B6694 on background #FFF8EC: 5.95:1 PASS (text (4.5:1))
+   success-ink #1D7A36 on background #FFF8EC: 5.11:1 PASS (text (4.5:1))
+   danger-ink #B3202A on background #FFF8EC: 6.3:1 PASS (text (4.5:1))
+   primary-ink #B23C0C on surface #FFFFFF: 5.92:1 PASS (text (4.5:1))
+   secondary-ink #0B6694 on surface #FFFFFF: 6.28:1 PASS (text (4.5:1))
+   success-ink #1D7A36 on surface #FFFFFF: 5.4:1 PASS (text (4.5:1))
+   danger-ink #B3202A on surface #FFFFFF: 6.65:1 PASS (text (4.5:1))
+   outline #2B1D3A on background #FFF8EC: 14.85:1 PASS (non-text (3:1))
+   focus-ring #7C4DFF on background #FFF8EC: 4.56:1 PASS (non-text (3:1))
+*/
