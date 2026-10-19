@@ -281,6 +281,13 @@
         }
         itemsById[itemId] = snack;
         copy.items.push(snack);
+        // Still orderable. The card just has an empty picture until
+        // menu.js gets an emoji or an image.
+        if (!textOf(snack.emoji) && !textOf(snack.image)) {
+          problems.push(
+            itemName + " has no picture. Add an emoji or an image in menu.js."
+          );
+        }
       });
 
       seenCategoryIds[id] = true;
@@ -368,7 +375,8 @@
     arrow.textContent = "\u25B8";
 
     var toggleLabel = document.createElement("span");
-    toggleLabel.textContent = "Check menu.js, then save and refresh.";
+    toggleLabel.className = "menu-note-label";
+    toggleLabel.textContent = "Show what's wrong";
     toggle.appendChild(arrow);
     toggle.appendChild(toggleLabel);
 
@@ -388,6 +396,7 @@
       body.hidden = !open;
       toggle.setAttribute("aria-expanded", open ? "true" : "false");
       arrow.textContent = open ? "\u25BE" : "\u25B8";
+      toggleLabel.textContent = open ? "Hide" : "Show what's wrong";
       refitTicket();
     });
 
@@ -997,9 +1006,10 @@
     if (fit < 1) {
       return;
     }
-    if (room - used > 1) {
-      ticketLinesEl.style.maxHeight = used + "px";
-    }
+    // Always lock the height, even when the room is an exact number
+    // of rows. Leaving it unset let the list grow after "More below"
+    // hid, and the last snacks could not be reached.
+    ticketLinesEl.style.maxHeight = used + "px";
   }
 
   // "More below" when a list is taller than the space it has.

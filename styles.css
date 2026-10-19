@@ -165,8 +165,8 @@ button:focus-visible {
   gap: 8px;
   width: 100%;
   margin: 0;
-  /* At least 48px, so a parent can hit it. */
-  min-height: 48px;
+  /* 64px, so a parent can hit it on an iPad. */
+  min-height: 64px;
   padding: 10px 14px;
   border: 0;
   border-radius: 12px;
@@ -289,6 +289,8 @@ button:focus-visible {
   gap: 12px;
   overflow: auto;
   overscroll-behavior: contain;
+  /* Room for the bottom row's drop shadow (0 6px 0). */
+  padding-bottom: 8px;
 }
 
 /* Drinks and Treats have fewer snacks, so two bigger columns. */
@@ -845,13 +847,23 @@ button {
   }
 }
 
-/* A short landscape iPad with the yellow note open. The note is one
-   line, and the rows give up a little padding, so four whole rows
-   still fit at 1024x698 and 1180x750. */
+/* A short landscape iPad with the yellow note. The toggle is 64px,
+   so the ticket gives up a little padding and four whole rows still
+   fit at 1024x698 and 1180x750. */
 @media (min-width: 901px) and (max-height: 760px) {
+  body:has(#menu-note:not([hidden])) .ticket {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
   body:has(#menu-note:not([hidden])) .ticket-row {
     padding-top: 0;
-    padding-bottom: 1px;
+    padding-bottom: 0;
+  }
+
+  body:has(#menu-note:not([hidden])) .ticket-scroll-hint {
+    padding-top: 0;
+    line-height: 1.1;
   }
 }
 
