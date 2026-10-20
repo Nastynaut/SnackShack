@@ -2,7 +2,8 @@
 
 | Asset | Source | License |
 |---|---|---|
-| `assets/food/*.svg` (burger, cheeseburger, hot-dog, fries, chicken-nuggets, pizza-slice, soda, lemonade, milkshake, water, ice-cream-cone, cookie) | Hand-authored SVG for the Snack Shack project (optimized with svgo) | Original work created for this project; owned by the project. No third-party art, characters, logos or brands. |
+| `assets/food/*.svg` (burger, cheeseburger, hot-dog, fries, chicken-nuggets, pizza-slice, soda, lemonade, milkshake, water, ice-cream-cone, cookie) | Hand-authored SVG for the Snack Shack project (optimized with svgo). The cheeseburger cheese layer was redrawn as soft rounded drips. | Original work created for this project; owned by the project. No third-party art, characters, logos or brands. |
+| `assets/options/*.svg` (ketchup, mustard, mayo, relish, pickles, lettuce, tomato, onion, cheese, chocolate, vanilla, strawberry, sprinkles, ice, no-ice) | Hand-authored SVG for the Snack Shack project (optimized with svgo) | Original work created for this project; owned by the project. No third-party art, characters, logos or brands. |
 | `assets/sounds/add.mp3`, `assets/sounds/checkout.mp3` | Synthesized from scratch with numpy by `make_sounds.py`, encoded with ffmpeg (libmp3lame). No samples or recordings used. | Original work created for this project; owned by the project. |
 | `make_sounds.py` | Written for this project | Original work; owned by the project. |
 | `assets/tokens.css`, `assets/buttons.css`, `assets/STYLE.md` | Written for this project | Original work; owned by the project. |
