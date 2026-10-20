@@ -84,6 +84,13 @@ Contrast (WCAG AA, computed):
 burger, cheeseburger, hot-dog, fries, chicken-nuggets, pizza-slice, soda, lemonade, milkshake, water, ice-cream-cone, cookie.
 All viewBox `0 0 128 128`, 6px rounded `#2B1D3A` outline, flat fills, smiley faces. Show at 96–128px on the menu, 64–72px on the ticket; never below 48px. Use `<img src="assets/food/burger.svg" alt="Burger">` style (`alt=""` if a visible label is next to it).
 
+## Option icons (`assets/options/*.svg`)
+Small icons for the options screen, drawn like the food icons: viewBox `0 0 128 128`, 6px round `#2B1D3A` outline, flat fills from this palette. Show them at 64–96px on toggle buttons. Each SVG has its own `<title>` and `aria-labelledby`. Use that name as the `alt` text (`alt="Ketchup"`). If a visible word sits next to the icon, use `alt=""`.
+
+- Toppings: `ketchup.svg`, `mustard.svg`, `mayo.svg`, `relish.svg`, `pickles.svg`, `lettuce.svg`, `tomato.svg`, `onion.svg`, `cheese.svg`
+- Flavors: `chocolate.svg`, `vanilla.svg`, `strawberry.svg`
+- Extras: `sprinkles.svg`, `ice.svg`, `no-ice.svg`
+
 ## Sounds (`assets/sounds/`)
 - `add.mp3` – soft ding when an item is added. `checkout.mp3` – cha-ching when the order is placed.
 - Play at volume 0.6, only after a tap, reset `currentTime = 0` before replay; provide a visible mute toggle (persist in `localStorage`) and skip playback when muted.
