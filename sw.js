@@ -372,10 +372,25 @@ function settleFromCache(request, cached, resolve, reject, realResponse) {
     return;
   }
   if (realResponse) {
-    resolve(realResponse);
+    // Nothing saved. Hand the site's answer back, but do not let the
+    // browser keep it for a later offline load.
+    resolve(request.headers.has("range") ? sliceRange(request, realResponse) : liveCopy(realResponse));
     return;
   }
   reject(new Error("offline"));
+}
+
+// The site's answer, with no-cache so the browser asks us again next
+// time. Otherwise an offline reload can reuse a newer file under the
+// older page.
+function liveCopy(response) {
+  var headers = new Headers(response.headers);
+  headers.set("Cache-Control", "no-cache");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: headers
+  });
 }
 
 function askNetwork(request) {
@@ -424,7 +439,7 @@ function askNetwork(request) {
       }
       finished = true;
       clearTimeout(timer);
-      resolve(request.headers.has("range") ? sliceRange(request, response) : response);
+      resolve(request.headers.has("range") ? sliceRange(request, response) : liveCopy(response));
     }).catch(function () {
       if (finished) {
         return;

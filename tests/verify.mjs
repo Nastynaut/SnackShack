@@ -157,7 +157,7 @@ function sendText(res, status, type, body, extra) {
 // not show that fetch to Playwright's route. portal() imitates a
 // Wi-Fi login page for the same reason.
 function startServer(dir, port) {
-  const state = { delayMs: 0, delayPath: "", delayAllMs: 0, portal: "", portalHits: 0 };
+  const state = { delayMs: 0, delayPath: "", delayAllMs: 0, portal: "", portalHits: 0, fileCache: "no-store" };
   const server = createServer(async (req, res) => {
     try {
       const url = new URL(req.url || "/", "http://127.0.0.1");
@@ -234,7 +234,7 @@ function startServer(dir, port) {
       res.writeHead(200, {
         "Content-Type": type,
         "Content-Length": info.size,
-        "Cache-Control": "no-store"
+        "Cache-Control": state.fileCache
       });
       if (req.method === "HEAD") {
         res.end();
@@ -275,6 +275,9 @@ function startServer(dir, port) {
     },
     clearPortal() {
       state.portal = "";
+    },
+    setFileCache(value) {
+      state.fileCache = value || "no-store";
     }
   };
 }
@@ -1353,9 +1356,8 @@ async function runReleaseChecks(browser, browserName) {
       swPath,
       original.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // release-ok')
     );
-    // The offline reload above can leave the worker on its snapshot for
-    // 30 seconds. A real file from the site clears that, so install
-    // saves the new app.js, menu.js, and cookie instead of the old ones.
+    // Confirm the new app.js is already on the server. The 30 second
+    // hold only changes runtime fallback. It does not change install.
     const stamped = await page.evaluate(async () => {
       const text = await (await fetch("app.js?clear-hold=" + Date.now())).text();
       return text.indexOf("/* v2-app */") !== -1;
@@ -1464,16 +1466,16 @@ async function runReleaseChecks(browser, browserName) {
         burgers > 0,
       JSON.stringify(after) + " burgers " + burgers
     );
-    const newerText = kept.newer.join(" ");
-    const installingText = kept.installing.join(" ");
+    const newerKept = keptFile(kept.newer, "newer.txt", "keep-newer");
+    const installingKept = keptFile(kept.installing, "installing.txt", "keep-installing");
     check(
       label + " activate deletes older copies and keeps a newer install",
       after.names.indexOf("snack-shack-1") === -1 &&
         after.names.indexOf("snack-shack-1-installing") === -1 &&
         after.names.indexOf("snack-shack-3") !== -1 &&
         after.names.indexOf("snack-shack-3-installing") !== -1 &&
-        (newerText === "" || newerText.indexOf("keep-newer") !== -1) &&
-        (installingText === "" || installingText.indexOf("keep-installing") !== -1),
+        newerKept &&
+        installingKept,
       JSON.stringify({ names: after.names, kept: kept })
     );
     await context.setOffline(true);
@@ -1499,6 +1501,15 @@ async function runReleaseChecks(browser, browserName) {
     rootServer.clearPortal();
     await context.close();
   }
+}
+
+function keptFile(entries, fileName, body) {
+  const hit = entries.find((entry) => entry.indexOf(body) !== -1 && entry.indexOf(fileName) !== -1);
+  if (!hit) {
+    return false;
+  }
+  const text = hit.split(" @ ")[0];
+  return text === body && Buffer.byteLength(text) === Buffer.byteLength(body);
 }
 
 function releaseMarks(app, menu, cookie) {
@@ -1540,6 +1551,109 @@ async function readReleaseFiles(page) {
       v2cookie: await saved("snack-shack-2", "assets/food/cookie.svg")
     };
   });
+}
+
+// The open tab sees the newer files while online, then reloads offline.
+// Those files must all be the installed snapshot, not a mix.
+async function runOfflineReload(browser, browserName) {
+  const context = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    serviceWorkers: "allow"
+  });
+  const page = await context.newPage();
+  page.__errors = track(page, new URL(BASE).origin);
+  const label = browserName + " offline reload";
+  const swPath = appFile("sw.js");
+  const originalSw = readFileSync(swPath, "utf8");
+  const originalApp = readFileSync(appFile("app.js"), "utf8");
+  const originalMenu = readFileSync(appFile("menu.js"), "utf8");
+  const originalCookie = readFileSync(appFile("assets/food/cookie.svg"), "utf8");
+  const originalHtml = readFileSync(appFile("index.html"), "utf8");
+  try {
+    await page.goto(BASE, { waitUntil: "load" });
+    await waitForCache(page);
+    writeFileSync(appFile("app.js"), originalApp + "\n/* v2-app */\n");
+    writeFileSync(appFile("menu.js"), originalMenu + "\n/* v2-menu */\n");
+    writeFileSync(appFile("assets/food/cookie.svg"), originalCookie + "<!-- v2-cookie -->");
+    writeFileSync(appFile("index.html"), originalHtml.replace("</body>", "<!-- v2-page --></body>"));
+    writeFileSync(
+      swPath,
+      originalSw.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // live-copy')
+    );
+    const state = await updateAndSettle(page, 20000);
+    const waiting = await workerSnapshot(page);
+    check(
+      label + " v2 is waiting in its own cache",
+      state === "installed" && waiting.waiting === "installed" && waiting.v1core && waiting.v2core,
+      state + " " + JSON.stringify(waiting)
+    );
+    // GitHub Pages keeps a file for 10 minutes. The worker must still
+    // hand back no-cache, or this reload mixes the old page with the new files.
+    rootServer.setFileCache("max-age=600");
+    await page.reload({ waitUntil: "load" });
+    const online = await page.evaluate(async () => {
+      async function one(path) {
+        const res = await fetch(path);
+        return { text: await res.text(), cache: res.headers.get("cache-control") || "" };
+      }
+      return {
+        app: await one("app.js"),
+        menu: await one("menu.js"),
+        cookie: await one("assets/food/cookie.svg"),
+        page: document.documentElement.outerHTML
+      };
+    });
+    check(
+      label + " the open tab sees v2 while online",
+      online.app.text.indexOf("/* v2-app */") !== -1 &&
+        online.menu.text.indexOf("/* v2-menu */") !== -1 &&
+        online.cookie.text.indexOf("<!-- v2-cookie -->") !== -1 &&
+        online.page.indexOf("<!-- v2-page -->") !== -1 &&
+        online.app.cache.indexOf("no-cache") !== -1 &&
+        online.menu.cache.indexOf("no-cache") !== -1 &&
+        online.cookie.cache.indexOf("no-cache") !== -1,
+      JSON.stringify({
+        app: online.app.cache,
+        menu: online.menu.cache,
+        cookie: online.cookie.cache
+      })
+    );
+    await context.setOffline(true);
+    await page.reload({ waitUntil: "load" });
+    const offline = await page.evaluate(async () => {
+      async function text(path) {
+        const res = await fetch(path);
+        return await res.text();
+      }
+      return {
+        app: await text("app.js"),
+        menu: await text("menu.js"),
+        cookie: await text("assets/food/cookie.svg"),
+        page: document.documentElement.outerHTML
+      };
+    });
+    const marks = {
+      app: offline.app.indexOf("/* v2-app */") !== -1,
+      menu: offline.menu.indexOf("/* v2-menu */") !== -1,
+      cookie: offline.cookie.indexOf("<!-- v2-cookie -->") !== -1,
+      page: offline.page.indexOf("<!-- v2-page -->") !== -1
+    };
+    const anyNew = marks.app || marks.menu || marks.cookie || marks.page;
+    check(
+      label + " offline reload is all v1, with no mixing",
+      !anyNew,
+      JSON.stringify(marks)
+    );
+  } finally {
+    rootServer.setFileCache("no-store");
+    writeFileSync(swPath, originalSw);
+    writeFileSync(appFile("app.js"), originalApp);
+    writeFileSync(appFile("menu.js"), originalMenu);
+    writeFileSync(appFile("assets/food/cookie.svg"), originalCookie);
+    writeFileSync(appFile("index.html"), originalHtml);
+    await context.setOffline(false);
+    await context.close();
+  }
 }
 
 // Files change, the version number does not. The installed snapshot stays.
@@ -1775,10 +1889,12 @@ async function guard(name, fn) {
     if (rootServer) {
       rootServer.clearPortal();
       rootServer.clearDelay();
+      rootServer.setFileCache("no-store");
     }
     if (subServer) {
       subServer.clearPortal();
       subServer.clearDelay();
+      subServer.setFileCache("no-store");
     }
   }
 }
@@ -1851,6 +1967,7 @@ async function main() {
       swSource.indexOf("function remember") === -1 &&
       swSource.indexOf("Only install writes") !== -1 &&
       readme.indexOf("always count up: 1, 2, 3") !== -1 &&
+      readme.indexOf("A rollback ships as a new, higher number") !== -1 &&
       readme.indexOf("ordinary edit") === -1 &&
       readme.indexOf("Netlify") === -1
   );
@@ -1894,6 +2011,7 @@ async function main() {
         await guard(name + " review", () => runReviewChecks(browser, name));
       }
       await guard(name + " release", () => runReleaseChecks(browser, name));
+      await guard(name + " offline reload", () => runOfflineReload(browser, name));
       await guard(name + " no bump", () => runNoBump(browser, name));
       await guard(name + " same version", () => runSameVersionFailure(browser, name));
       await guard(name + " first install", () => runPartialFirstInstall(browser, name, rootServer, BASE, name + " first install"));

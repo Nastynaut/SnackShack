@@ -63,6 +63,23 @@ function show(ref, path) {
   return result.stdout;
 }
 
+// True when this commit contains the file. A rename or delete that
+// leaves the old path in APP_FILES makes install fail for everyone.
+function fileExists(ref, path) {
+  const result = git(["cat-file", "-e", ref + ":" + path]);
+  return result.status === 0;
+}
+
+function missingAppFiles(ref, files) {
+  const missing = [];
+  for (let i = 0; i < files.length; i++) {
+    if (!fileExists(ref, files[i])) {
+      missing.push(files[i]);
+    }
+  }
+  return missing;
+}
+
 function parseSw(source, label) {
   // Anchored to the real line, so a commented-out
   //   // var CACHE_VERSION = "99";
@@ -93,12 +110,22 @@ if (!refExists(baseRef)) {
 }
 
 const baseSw = show(baseRef, "sw.js");
+const headSwEarly = show(headRef, "sw.js");
 if (baseSw === null) {
+  if (headSwEarly !== null) {
+    const listed = missingAppFiles(headRef, parseSw(headSwEarly, headRef).files);
+    if (listed.length > 0) {
+      console.error(
+        "APP_FILES lists files that are missing at " + headRef + ": " + listed.join(", ")
+      );
+      process.exit(1);
+    }
+  }
   console.log("Base " + baseRef + " has no sw.js. Nothing to compare.");
   process.exit(0);
 }
 
-const headSw = show(headRef, "sw.js");
+const headSw = headSwEarly;
 if (headSw === null) {
   console.error("Head " + headRef + " has no sw.js, but the base does.");
   process.exit(1);
@@ -106,6 +133,13 @@ if (headSw === null) {
 
 const baseInfo = parseSw(baseSw, baseRef);
 const headInfo = parseSw(headSw, headRef);
+const missing = missingAppFiles(headRef, headInfo.files);
+if (missing.length > 0) {
+  console.error(
+    "APP_FILES lists files that are missing at " + headRef + ": " + missing.join(", ")
+  );
+  process.exit(1);
+}
 
 if (headInfo.version > baseInfo.version) {
   console.log(
@@ -121,7 +155,9 @@ if (headInfo.version < baseInfo.version) {
   process.exit(1);
 }
 
-const diff = git(["diff", "--name-only", baseRef, headRef]);
+// --no-renames so a renamed file shows up as the old path and the new
+// path. Rename detection would hide the old path, and install would 404.
+const diff = git(["diff", "--name-only", "--no-renames", baseRef, headRef]);
 if (diff.status !== 0) {
   console.error(diff.stderr || "git diff failed");
   process.exit(1);
