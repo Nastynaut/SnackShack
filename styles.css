@@ -1,0 +1,1138 @@
+/* ============================================================
+   SNACK SHACK LOOK
+   ============================================================
+   This file is the whole design. The page still looks finished
+   if assets/tokens.css and assets/buttons.css are not here yet.
+
+   When tokens.css IS here, the var(--color-..., fallback) lines
+   pick up its palette. Our fallback colors match that palette,
+   so nothing jumps when the file arrives.
+
+   Built for a tablet held sideways (about 1024x768 or 1280x800).
+   Big targets, dark ink on bright fills, no internet fonts.
+*/
+
+:root {
+  --ink: var(--color-text, #2b1d3a);
+  --muted: var(--color-text-muted, #5e4f6e);
+  --paper: var(--color-surface, #ffffff);
+  --cream: var(--color-background, #fff8ec);
+  --cream-deep: var(--color-surface-alt, #fff0d6);
+  --orange: var(--color-primary, #ff7a45);
+  --blue: var(--color-drinks, #3db8f5);
+  --yellow: var(--color-accent, #ffd23f);
+  --green: var(--color-success, #3fbf5f);
+  --pink: var(--color-desserts, #ff8fc0);
+  --red: var(--color-danger, #f2545b);
+  --outline: var(--color-outline, #2b1d3a);
+  --focus: var(--color-focus-ring, #7c4dff);
+  --disabled-bg: var(--color-disabled-bg, #e6e1ea);
+  --disabled-text: var(--color-disabled-text, #5c5266);
+  --font-ui: var(--font-body, "Trebuchet MS", "Segoe UI", Verdana, "Noto Sans", sans-serif);
+  --font-sign: var(--font-heading, Georgia, "Liberation Serif", "Times New Roman", serif);
+  --chunky: var(--shadow-chunky, 0 6px 0 #2b1d3a);
+  --chunky-pressed: var(--shadow-chunky-pressed, 0 2px 0 #2b1d3a);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  /* Three bands: awning, title, then whichever screen is open. */
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+  color: var(--ink);
+  background: var(--cream);
+  font-family: var(--font-ui);
+  font-size: 20px;
+  line-height: 1.4;
+}
+
+button {
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  /* Stops a double-tap on a tablet from zooming the page. */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible {
+  outline: 5px solid var(--focus);
+  outline-offset: 4px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* Orange-and-yellow shop awning. */
+.awning {
+  height: 18px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--orange) 0 36px,
+    var(--yellow) 36px 72px
+  );
+}
+
+.topbar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 20px;
+}
+
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand h1 {
+  margin: 0;
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.tagline {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.mute-button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 148px;
+  min-height: 64px;
+  padding: 0 22px;
+  border: 4px solid var(--outline);
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-weight: 700;
+}
+
+/* Two classes beat the single .btn rule in buttons.css, so "Sound" stays this size. */
+.topbar .mute-button {
+  font-size: 1.35rem;
+}
+
+.mute-button.is-muted {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  box-shadow: none;
+}
+
+.mute-button:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.menu-note {
+  padding: 0;
+  border: 3px solid var(--outline);
+  border-radius: 16px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.05rem;
+  overflow: hidden;
+}
+
+/* Starts as one line so a short landscape iPad still fits four rows.
+   Tap it to read the rest. */
+.menu-note-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  /* 64px, so a parent can hit it on an iPad. */
+  min-height: 64px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  font-family: var(--font-sign);
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: left;
+}
+
+.menu-note-arrow {
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.menu-note-body {
+  /* A long list of problems scrolls inside the note, so it
+     cannot push the snacks or Done off the screen. */
+  max-height: 120px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 14px 10px;
+}
+
+.menu-note p {
+  margin: 0 0 4px;
+}
+
+.menu-note p:last-child {
+  margin: 0;
+}
+
+/* The picture sits beside the word for kids who are still learning to read.
+   aria-hidden in the HTML, so a screen reader says the word only. */
+.btn-icon {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: 1.25em;
+  line-height: 1;
+}
+
+/* Keyboard focus only. A tap still moves focus here for screen readers,
+   but it should not draw the purple ring. */
+.screen-heading:focus-visible {
+  outline: 5px solid var(--focus);
+  outline-offset: 4px;
+}
+
+/* ----------------------------------------------------------------
+   Screen 1: menu + ticket
+---------------------------------------------------------------- */
+
+.menu-screen {
+  display: grid;
+  /* Wide enough for a name, $297, and two 64px buttons on one line. */
+  grid-template-columns: minmax(0, 1fr) 460px;
+  gap: 16px;
+  padding: 4px 16px 14px;
+  min-height: 0;
+}
+
+.menu-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 64px;
+  border: 4px solid var(--outline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.tab:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+/* Each tab has its own fill so Food / Drinks / Treats
+   are not told apart by color alone — the word is still on the tab. */
+.tab.is-selected[data-category="food"] {
+  background: var(--orange);
+}
+
+.tab.is-selected[data-category="drinks"] {
+  background: var(--blue);
+}
+
+.tab.is-selected[data-category="treats"] {
+  background: var(--pink);
+}
+
+.menu-grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  align-content: start;
+  gap: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  /* Room for the bottom row's drop shadow (0 6px 0). */
+  padding-bottom: 8px;
+}
+
+/* Drinks and Treats have fewer snacks, so two bigger columns. */
+.menu-grid.is-few {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.menu-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  max-height: 320px;
+  padding: 8px 8px 12px;
+  border: 4px solid var(--outline);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+}
+
+/* A long-press on iPad must not select the words or pop a callout. */
+.menu-item,
+.tab,
+.ticket,
+.summary-card,
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.menu-item:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.menu-item.is-on-ticket {
+  background: var(--cream-deep);
+}
+
+/* Emoji and the designer's SVG share one box.
+   Whichever is hidden gets out of the way. */
+.picture {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: clamp(96px, 14vh, 120px);
+}
+
+.picture > * {
+  grid-area: 1 / 1;
+}
+
+.emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  font-size: clamp(64px, 10vh, 92px);
+  line-height: 1;
+}
+
+.picture img {
+  width: clamp(96px, 14vh, 120px);
+  height: clamp(96px, 14vh, 120px);
+  object-fit: contain;
+}
+
+.item-name {
+  font-family: var(--font-sign);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  max-width: 100%;
+  /* Wrap between words. "Cheeseburger" stays one word. */
+  overflow-wrap: normal;
+}
+
+.item-price {
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 8px;
+  border: 3px solid var(--outline);
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.1rem;
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+}
+
+.ticket,
+.summary-card {
+  border: 4px solid var(--outline);
+  border-radius: 28px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+}
+
+.ticket {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px 16px 14px;
+}
+
+.ticket-title,
+.summary-heading h2 {
+  margin: 0;
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.ticket-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.ticket-lines {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  /* A fling stops on a row, not halfway through a + / −.
+     contain keeps the scroll from dragging the whole page. */
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+}
+
+.ticket-scroll-hint {
+  margin: 0;
+  padding: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.ticket-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 12px;
+  color: var(--muted);
+  font-size: 1.3rem;
+  text-align: center;
+}
+
+/* Name and the small "each" price on the left. Line price and
+   − / qty / + sit on the same line, so more rows fit on an iPad. */
+.ticket-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0 8px;
+  align-items: center;
+  padding: 4px 0 6px;
+  border-bottom: 3px dashed var(--cream-deep);
+  scroll-snap-align: start;
+}
+
+.line-main {
+  min-width: 0;
+}
+
+.line-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 800;
+  line-height: 1.15;
+  overflow-wrap: break-word;
+}
+
+.line-each {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.1;
+}
+
+.line-price {
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.qty {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.qty-button {
+  width: 64px;
+  height: 64px;
+  border: 4px solid var(--outline);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* buttons.css loads after this file and sets .btn { font-size: 24px }
+   and .btn--icon to a 64px circle. Two classes beat one class, so the
+   + and − stay 64px on a tablet no matter which file loads last. */
+.qty .qty-button {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 2rem;
+}
+
+.qty-minus {
+  background: var(--red);
+}
+
+.qty-plus {
+  background: var(--green);
+}
+
+.qty-button:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.qty-button:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.qty-number {
+  min-width: 2ch;
+  font-size: 1.8rem;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-footer {
+  padding-top: 8px;
+}
+
+.total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  font-family: var(--font-sign);
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.total-row strong {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.done-button,
+.edit-button,
+.new-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 64px;
+  border: 4px solid var(--outline);
+  border-radius: 20px;
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-weight: 700;
+}
+
+/* Same idea as .qty .qty-button: two classes beat .btn in buttons.css,
+   so these words do not shrink when that file shows up. */
+.summary-actions .edit-button,
+.summary-actions .new-button {
+  font-size: 1.6rem;
+}
+
+.ticket .done-button {
+  min-height: 88px;
+  /* buttons.css caps .btn--checkout at 480px. A wide portrait ticket
+     should still stretch Done edge to edge. */
+  max-width: none;
+  width: 100%;
+  background: var(--yellow);
+  font-size: 2rem;
+}
+
+.done-button:active:not(:disabled),
+.edit-button:active,
+.new-button:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.done-button:disabled {
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  border-style: dashed;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* The check mark is an emoji, so it does not follow the gray text color.
+   Fade it while Done is disabled. */
+.done-button:disabled .btn-icon {
+  opacity: 0.35;
+}
+
+.edit-button {
+  background: var(--paper);
+}
+
+.new-button {
+  background: var(--orange);
+}
+
+/* ----------------------------------------------------------------
+   Screen 2: summary
+---------------------------------------------------------------- */
+
+.summary-screen {
+  min-height: 0;
+  padding: 4px 20px 14px;
+}
+
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 16px 28px 16px;
+}
+
+.summary-count {
+  margin: 2px 0 8px;
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+
+.summary-columns,
+.summary-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140px 120px;
+  gap: 12px;
+  align-items: center;
+}
+
+.summary-columns {
+  padding: 0 4px 6px;
+  color: var(--muted);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.summary-columns span:nth-child(n + 2),
+.summary-row span:nth-child(n + 2) {
+  text-align: right;
+}
+
+.summary-lines {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.summary-row {
+  padding: 12px 4px;
+  border-top: 3px dashed var(--cream-deep);
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+.summary-row .summary-price,
+.summary-total strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-total {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 4px solid var(--outline);
+}
+
+.summary-total strong {
+  font-size: 4rem;
+}
+
+.summary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.noscript {
+  margin: 16px;
+  font-size: 1.3rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-item:active,
+  .tab:active,
+  .qty-button:active,
+  .done-button:active,
+  .edit-button:active,
+  .new-button:active,
+  .mute-button:active {
+    transform: none;
+  }
+}
+
+/* A wider tablet gets a slightly wider ticket. */
+@media (min-width: 1200px) {
+  .menu-screen {
+    grid-template-columns: minmax(0, 1fr) 480px;
+    gap: 20px;
+    padding: 6px 20px 18px;
+  }
+
+  .item-name {
+    font-size: 1.45rem;
+  }
+}
+
+/* Narrower than a landscape iPad: two columns so names are not crushed.
+   768-wide portrait is in this range. Phones are too. */
+@media (max-width: 900px) {
+  .menu-grid,
+  .menu-grid.is-few {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tabs {
+    min-width: 0;
+  }
+
+  .tab {
+    min-width: 0;
+  }
+}
+
+/* Portrait iPad. A 460px ticket beside the menu leaves only ~260px
+   for the snacks, so the tabs shrink and "Cheeseburger" breaks.
+   Put the menu on top and the ticket underneath instead. The ticket
+   is then the full width, so a name, $297, and two 64px buttons
+   still fit on one line, and there is room for four whole rows.
+   A short landscape phone is also under 900px wide. It stays side
+   by side, because the max-height: 500px rules come later and there
+   is not enough height to stack. */
+@media (max-width: 900px) and (min-height: 501px) {
+  .menu-screen {
+    grid-template-columns: minmax(0, 1fr);
+    /* The ticket is only as tall as its rows, and never taller than
+       about 540px. An empty ticket leaves the menu most of the screen. */
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .ticket {
+    max-height: 540px;
+  }
+
+  .ticket-empty {
+    height: auto;
+    min-height: 72px;
+  }
+
+  /* Three columns fit across 768px (about 230px each), so names
+     like Cheeseburger stay on one line and each card is well over 64px.
+     A short list (Drinks, Treats) stays two wider columns. */
+  .menu-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .menu-grid.is-few {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .menu-item {
+    height: auto;
+    max-height: none;
+  }
+
+  /* Four 64px rows, plus the "More below" line, have to fit above Done.
+     A little less padding on the row is enough. The buttons stay 64px. */
+  .ticket-row {
+    padding: 1px 0 2px;
+  }
+
+  .picture {
+    height: 96px;
+  }
+
+  .emoji {
+    font-size: 72px;
+  }
+
+  .picture img {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+/* A short landscape iPad with the yellow note. The toggle is 64px,
+   so the ticket gives up a little padding and four whole rows still
+   fit at 1024x698 and 1180x750. */
+@media (min-width: 901px) and (max-height: 760px) {
+  body:has(#menu-note:not([hidden])) .ticket {
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  body:has(#menu-note:not([hidden])) .ticket-row {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  body:has(#menu-note:not([hidden])) .ticket-scroll-hint {
+    padding-top: 0;
+    line-height: 1.1;
+  }
+}
+
+/* Phone portrait. The ticket sits under the menu instead of covering it. */
+@media (max-width: 700px) {
+  .topbar {
+    padding: 6px 12px;
+  }
+
+  .brand h1 {
+    font-size: 1.55rem;
+  }
+
+  .tagline {
+    font-size: 0.95rem;
+  }
+
+  .menu-screen {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1.15fr) minmax(200px, 0.9fr);
+    gap: 10px;
+    padding: 4px 10px 10px;
+  }
+
+  /* The portrait iPad uses three columns. A phone is too narrow for that. */
+  .menu-grid,
+  .menu-grid.is-few {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ticket {
+    max-height: none;
+  }
+
+  /* One line per snack, so + / − fit in the short ticket under the menu. */
+  .ticket-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    padding: 4px 0;
+  }
+
+  .line-each {
+    display: none;
+  }
+
+  .qty {
+    grid-column: auto;
+    gap: 6px;
+  }
+
+  /* Two classes, so this beats the 64px circle in buttons.css. */
+  .qty .qty-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 1.5rem;
+  }
+
+  .ticket .done-button {
+    min-height: 56px;
+    font-size: 1.3rem;
+  }
+
+  .total-row {
+    margin-bottom: 4px;
+  }
+
+  .total-row strong {
+    font-size: 2rem;
+  }
+
+  .menu-grid,
+  .menu-grid.is-few {
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .menu-item {
+    height: auto;
+    max-height: none;
+  }
+
+  .tabs {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .tab {
+    min-height: 56px;
+    font-size: 1rem;
+    padding: 0 4px;
+  }
+
+  .picture {
+    height: 72px;
+  }
+
+  .emoji {
+    font-size: 52px;
+  }
+
+  .picture img {
+    width: 72px;
+    height: 72px;
+  }
+
+  .summary-screen {
+    padding: 4px 10px 10px;
+  }
+
+  .summary-card {
+    padding: 12px 14px;
+  }
+
+  .summary-columns,
+  .summary-row {
+    grid-template-columns: minmax(0, 1fr) 72px 72px;
+    gap: 8px;
+    font-size: 1.2rem;
+  }
+
+  .summary-total strong {
+    font-size: 2.6rem;
+  }
+
+  .summary-actions {
+    gap: 10px;
+  }
+}
+
+/* Phone landscape. Very little height, so pictures and rows shrink
+   and the ticket list scrolls instead of clipping prices. */
+@media (max-height: 500px) {
+  .awning {
+    height: 8px;
+  }
+
+  .topbar {
+    padding: 4px 10px;
+  }
+
+  .brand h1 {
+    font-size: 1.3rem;
+  }
+
+  .tagline {
+    display: none;
+  }
+
+  .mute-button,
+  .topbar .mute-button {
+    min-height: 44px;
+    min-width: 120px;
+    font-size: 1rem;
+  }
+
+  .menu-screen {
+    gap: 8px;
+    padding: 4px 8px 8px;
+  }
+
+  .tabs {
+    margin-bottom: 6px;
+  }
+
+  .tab {
+    min-height: 40px;
+    font-size: 0.95rem;
+    box-shadow: 0 3px 0 var(--outline);
+  }
+
+  .menu-grid {
+    gap: 6px;
+    grid-auto-rows: auto;
+    align-content: start;
+  }
+
+  .menu-item {
+    height: auto;
+    max-height: none;
+    padding: 4px 4px 6px;
+    border-bottom-width: 4px;
+    box-shadow: 0 3px 0 var(--outline);
+  }
+
+  .picture {
+    height: 36px;
+  }
+
+  .emoji {
+    font-size: 28px;
+  }
+
+  .picture img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .item-name {
+    font-size: 0.85rem;
+  }
+
+  .item-price {
+    font-size: 0.8rem;
+    padding: 0 6px;
+  }
+
+  .ticket {
+    padding: 6px 8px;
+  }
+
+  .ticket-title {
+    font-size: 1.15rem;
+  }
+
+  .ticket-row {
+    padding: 2px 0;
+  }
+
+  .line-each {
+    display: none;
+  }
+
+  .line-name {
+    font-size: 0.95rem;
+  }
+
+  .line-price {
+    font-size: 1rem;
+  }
+
+  .qty {
+    gap: 4px;
+  }
+
+  .qty-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    border-width: 3px;
+    box-shadow: 0 3px 0 var(--outline);
+  }
+
+  /* Two classes, so this beats .btn and .btn--icon in buttons.css. */
+  .qty .qty-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    font-size: 1.35rem;
+  }
+
+  .qty-number {
+    font-size: 1.1rem;
+  }
+
+  .total-row {
+    margin-bottom: 4px;
+    font-size: 1rem;
+  }
+
+  .total-row strong {
+    font-size: 1.5rem;
+  }
+
+  .ticket .done-button {
+    min-height: 48px;
+    font-size: 1.15rem;
+  }
+}
