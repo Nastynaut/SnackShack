@@ -4,16 +4,20 @@
 // The iPad saves these files the first time Snack Shack is opened
 // online. After that, the home-screen app works with Wi-Fi off.
 //
-// While the iPad is online, we ask the site for a fresh copy and
-// keep that copy. If the site is slow or off, we use the saved one.
+// While the iPad is online, we show a fresh copy from the site.
+// That copy is not written over the snapshot install saved.
+// If the site is slow or off, we use that snapshot. Offline is
+// always one release, so the page, scripts, and pictures match.
 //
 // Paths are relative (no leading slash) so the same file works at
 // the root of a site or in a folder such as /SnackShack/.
 
 // The number on this saved copy. Each number gets its own cache,
-// named snack-shack-1, snack-shack-2, and so on. An open tab keeps
-// reading the copy it already has until the app is closed.
-// Change the number only when that old copy should be forgotten.
+// named snack-shack-1, snack-shack-2, and so on. Always count up:
+// 1, then 2, then 3. Every change to an app file needs the next
+// number. Only install writes a release cache. An open tab keeps
+// its snapshot until a higher number takes over, after the app is
+// closed and opened again.
 var CACHE_VERSION = "1";
 var CACHE_NAME = "snack-shack-" + CACHE_VERSION;
 
@@ -32,9 +36,8 @@ var NETWORK_WAIT_MS = 3000;
 var offlineUntil = 0;
 var OFFLINE_HOLD_MS = 30000;
 
-// Only files the page needs while it runs. cache.addAll stops the
-// whole save if any ONE of these is missing, so notes and license
-// text stay out of this list.
+// Only files the page needs while it runs. The save stops if any ONE
+// of these is missing, so notes and license text stay out of this list.
 var APP_FILES = [
   "./",
   "index.html",
@@ -168,8 +171,7 @@ function saveOne(cache, path) {
   });
 }
 
-// Every saved file has to be present. If one is missing, throw away
-// this release's cache so a later visit does not keep a half copy.
+// Every saved file has to be present before this release is published.
 function confirmSaved(cache, path) {
   return cache.match(new Request(path)).then(function (hit) {
     if (!hit) {
@@ -188,41 +190,51 @@ function copyCached(fromCache, toCache, request) {
   });
 }
 
-// Move the side cache into this release's cache, then drop the side cache.
-function publishRelease(staging) {
-  return caches.open(CACHE_NAME).then(function (live) {
-    return staging.keys().then(function (keys) {
-      var jobs = [];
-      for (var i = 0; i < keys.length; i++) {
-        jobs.push(copyCached(staging, live, keys[i]));
-      }
-      return Promise.all(jobs);
-    }).then(function () {
-      var checks = [];
-      for (var i = 0; i < APP_FILES.length; i++) {
-        checks.push(confirmSaved(live, APP_FILES[i]));
-      }
-      return Promise.all(checks);
-    });
-  }).then(function () {
-    return caches.delete(INSTALL_CACHE);
+// True when this release's cache already holds every app file.
+function cacheIsComplete(cache) {
+  var checks = [];
+  for (var i = 0; i < APP_FILES.length; i++) {
+    checks.push(confirmSaved(cache, APP_FILES[i]));
+  }
+  return Promise.all(checks).then(function () {
+    return true;
+  }, function () {
+    return false;
   });
 }
 
-// A failed save must not leave a half copy. A complete copy that an
-// open tab is already using stays where it is.
-function discardFailedInstall() {
-  return caches.delete(INSTALL_CACHE).then(function () {
-    return caches.open(CACHE_NAME).then(function (live) {
-      var checks = [];
-      for (var i = 0; i < APP_FILES.length; i++) {
-        checks.push(confirmSaved(live, APP_FILES[i]));
+// Move the side cache into this release's cache, then drop the side cache.
+// If this number already has a snapshot, leave it. A new snapshot needs
+// a higher CACHE_VERSION. Only install writes here.
+function publishRelease(staging) {
+  return caches.open(CACHE_NAME).then(function (live) {
+    return cacheIsComplete(live).then(function (already) {
+      if (already) {
+        return caches.delete(INSTALL_CACHE);
       }
-      return Promise.all(checks).catch(function () {
-        return caches.delete(CACHE_NAME);
+      return staging.keys().then(function (keys) {
+        var jobs = [];
+        for (var i = 0; i < keys.length; i++) {
+          jobs.push(copyCached(staging, live, keys[i]));
+        }
+        return Promise.all(jobs);
+      }).then(function () {
+        var checks = [];
+        for (var i = 0; i < APP_FILES.length; i++) {
+          checks.push(confirmSaved(live, APP_FILES[i]));
+        }
+        return Promise.all(checks);
+      }).then(function () {
+        return caches.delete(INSTALL_CACHE);
       });
     });
   });
+}
+
+// A failed save only throws away the side cache. The named cache
+// may be the one an open tab is reading right now, so it stays.
+function discardFailedInstall() {
+  return caches.delete(INSTALL_CACHE);
 }
 
 function installRelease() {
@@ -256,16 +268,22 @@ self.addEventListener("install", function (event) {
   event.waitUntil(installRelease());
 });
 
+// True for snack-shack-1 or snack-shack-1-installing when this
+// worker is a higher number, like 2. Always count CACHE_VERSION up.
+function isOlderCopy(name) {
+  var match = /^snack-shack-(\d+)(-installing)?$/.exec(name);
+  return match !== null && Number(match[1]) < Number(CACHE_VERSION);
+}
+
 self.addEventListener("activate", function (event) {
   event.waitUntil(
     caches.keys().then(function (names) {
       var jobs = [];
       for (var i = 0; i < names.length; i++) {
-        // Only our own old copies. Another app on this site keeps its cache.
-        // This worker reads CACHE_NAME and leaves that one in place.
-        var name = names[i];
-        if (name.indexOf("snack-shack-") === 0 && name !== CACHE_NAME) {
-          jobs.push(caches.delete(name));
+        // Only our own OLDER copies. A newer number may be a release
+        // that is still installing, and another app keeps its cache.
+        if (isOlderCopy(names[i])) {
+          jobs.push(caches.delete(names[i]));
         }
       }
       return Promise.all(jobs);
@@ -296,13 +314,6 @@ function isPageLoad(request) {
   return request.mode === "navigate";
 }
 
-// The address we saved the page under, without a ?query.
-function pageKey(request) {
-  var url = new URL(request.url);
-  url.search = "";
-  return url.toString();
-}
-
 function noteSavedPage() {
   offlineUntil = Date.now() + OFFLINE_HOLD_MS;
 }
@@ -316,10 +327,11 @@ function savedCopyIsEnough(request) {
   return !isPageLoad(request) && Date.now() < offlineUntil;
 }
 
-// Ask the site first. If it answers with our real file, keep that
-// copy in this worker's own cache. If it is quiet for about 3
-// seconds, sends a login page, or cannot be reached, use the saved
-// copy. If nothing is saved, hand back the site's real answer.
+// Ask the site first and show that answer. Do not save it. Only
+// install writes the release cache. If the site is quiet for about
+// 3 seconds, sends a login page, or cannot be reached, use the
+// installed snapshot. If nothing is saved, hand back the site's
+// real answer.
 function networkFirst(request) {
   if (savedCopyIsEnough(request)) {
     return fromCache(request).then(function (cached) {
@@ -332,19 +344,34 @@ function networkFirst(request) {
   return askNetwork(request);
 }
 
+// Use the saved copy when we have one. Otherwise hand back the real
+// answer, or fail when the site never answered.
+function settleFromCache(request, cached, resolve, reject, realResponse) {
+  if (cached) {
+    if (isPageLoad(request)) {
+      noteSavedPage();
+    }
+    resolve(cached);
+    return;
+  }
+  if (realResponse) {
+    resolve(realResponse);
+    return;
+  }
+  reject(new Error("offline"));
+}
+
 function askNetwork(request) {
   return new Promise(function (resolve, reject) {
     var finished = false;
     var timer = setTimeout(function () {
       fromCache(request).then(function (cached) {
+        // No saved copy yet. Leave this open so the real answer can land.
         if (finished || !cached) {
           return;
         }
         finished = true;
-        if (isPageLoad(request)) {
-          noteSavedPage();
-        }
-        resolve(cached);
+        settleFromCache(request, cached, resolve, reject, null);
       });
     }, NETWORK_WAIT_MS);
 
@@ -364,35 +391,23 @@ function askNetwork(request) {
           }
           finished = true;
           clearTimeout(timer);
-          if (cached) {
-            if (isPageLoad(request)) {
-              noteSavedPage();
-            }
-            resolve(cached);
-            return;
-          }
-          resolve(response);
+          settleFromCache(request, cached, resolve, reject, response);
         });
       }
-      // The page already came from the saved copy. Drop this later
+      // The page already came from the snapshot. Drop this later
       // page. Saving it would mix a new page with the old files.
       if (finished && isPageLoad(request)) {
         return;
       }
       noteLiveFile();
       if (finished) {
-        remember(request, response.clone());
+        // A file already came from the snapshot. Do not save this
+        // later answer into the release cache.
         return;
       }
       finished = true;
       clearTimeout(timer);
-      var saved = response.clone();
-      var send = request.headers.has("range") ? sliceRange(request, response) : response;
-      remember(request, saved).then(function () {
-        resolve(send);
-      }, function () {
-        resolve(send);
-      });
+      resolve(request.headers.has("range") ? sliceRange(request, response) : response);
     }).catch(function () {
       if (finished) {
         return;
@@ -403,21 +418,14 @@ function askNetwork(request) {
         }
         finished = true;
         clearTimeout(timer);
-        if (cached) {
-          if (isPageLoad(request)) {
-            noteSavedPage();
-          }
-          resolve(cached);
-          return;
-        }
-        reject(new Error("offline"));
+        settleFromCache(request, cached, resolve, reject, null);
       }, function () {
         if (finished) {
           return;
         }
         finished = true;
         clearTimeout(timer);
-        reject(new Error("offline"));
+        settleFromCache(request, null, resolve, reject, null);
       });
     });
   });
@@ -433,13 +441,6 @@ function freshRequest(request) {
   } catch (err) {
     return new Request(request.url, { cache: "reload" });
   }
-}
-
-function remember(request, response) {
-  var key = isPageLoad(request) ? pageKey(request) : request.url;
-  return caches.open(CACHE_NAME).then(function (cache) {
-    return cache.put(key, response);
-  });
 }
 
 // Saved copy. A page load with a ?query uses the saved page.

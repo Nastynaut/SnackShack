@@ -25,8 +25,6 @@ This serves the `main` branch from the root of the repo. The repo needs to be pu
 
 The address is **https://nastynaut.github.io/SnackShack/**.
 
-Netlify is an optional host. Its free plan adds a badge over the app.
-
 ### Add it to the iPad home screen
 
 1. On the iPad, open **Safari**.
@@ -44,7 +42,7 @@ GitHub Pages caches files for up to 10 minutes, so after a change is merged it c
 
 To lock orientation, use iPad Rotation Lock in Control Center.
 
-`CACHE_VERSION` in `sw.js` is the number on the saved copy (`1` makes a cache named `snack-shack-1`). You do not need to change it for an ordinary edit. Change the number (for example from `1` to `2`) only when that saved copy is wrong and the iPad should forget it. The new copy gets its own cache. The old one is dropped when the app is closed and opened again. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file. Keep the path relative, with no slash at the start.
+`CACHE_VERSION` in `sw.js` is the number on the saved copy (`1` makes a cache named `snack-shack-1`). Every time you change an app file, always count up: 1, 2, 3. Never go back to a smaller number, and do not ship a file change on the same number. The new copy gets its own cache. The open tab keeps the older snapshot until the app is closed and opened again. Older copies are dropped then. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file and count the number up. Keep the path relative, with no slash at the start.
 
 ### Try it on your computer
 

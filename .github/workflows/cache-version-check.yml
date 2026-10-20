@@ -1,0 +1,19 @@
+# On a pull request, fail if an app file or sw.js changed and
+# CACHE_VERSION did not go up. There is no build and no deploy.
+
+name: Cache version
+
+on:
+  pull_request:
+
+jobs:
+  cache-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pull request
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require a higher CACHE_VERSION when app files change
+        run: node .github/workflows/check-cache-version.mjs "origin/${{ github.base_ref }}" HEAD

@@ -4,7 +4,9 @@ import { chromium, webkit } from "playwright";
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
-import { mkdir, readFileSync, readdirSync, statSync, symlink, rm, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlink, writeFileSync } from "node:fs";
+import { mkdir, rm } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -13,9 +15,29 @@ const mkdirAsync = promisify(mkdir);
 const rmAsync = promisify(rm);
 const symlinkAsync = promisify(symlink);
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(HERE, "..");
 const HOST_DIR = "/tmp/snack-host";
-const ARTIFACTS = "/opt/cursor/artifacts";
+// The server serves this copy. Tests never write the repo's own files.
+let appDir = ROOT;
+
+function chooseResultsDir() {
+  const fallback = join(HERE, "results");
+  const preferred = process.env.SNACK_RESULTS_DIR || fallback;
+  try {
+    mkdirSync(preferred, { recursive: true });
+    return preferred;
+  } catch (err) {
+    mkdirSync(fallback, { recursive: true });
+    return fallback;
+  }
+}
+
+const ARTIFACTS = chooseResultsDir();
+
+function appFile(name) {
+  return join(appDir, name);
+}
 const PORT = 8765;
 const SUB_PORT = 8766;
 const BASE = `http://127.0.0.1:${PORT}/`;
@@ -46,10 +68,35 @@ const foreign = [];
 let rootServer;
 let subServer;
 
+function resultsText() {
+  const passed = results.filter((item) => item.pass).length;
+  const failed = results.filter((item) => !item.pass).length;
+  return [
+    `Snack Shack issue #5 Playwright results`,
+    `Passed: ${passed}`,
+    `Failed: ${failed}`,
+    `Browsers: Chromium and WebKit`,
+    `Viewports: 1024x768, 1180x820, 768x1024, 844x390`,
+    `Also: subfolder /SnackShack/, offline reload, network-first snapshot, 3s hang, hung page load, captive portal, partial install, per-release update, no-bump snapshot, late page, real 404, page marker, host headers, query offline, manifest, icons, B3, B4`,
+    ``,
+    ...results.map((item) => `${item.pass ? "PASS" : "FAIL"}  ${item.name}${item.detail ? " — " + item.detail : ""}`)
+  ].join("\n") + "\n";
+}
+
+function writeResults() {
+  try {
+    mkdirSync(ARTIFACTS, { recursive: true });
+    writeFileSync(join(ARTIFACTS, "playwright_results.txt"), resultsText());
+  } catch (err) {
+    console.error("Could not write results: " + err);
+  }
+}
+
 function check(name, pass, detail) {
   results.push({ name, pass: !!pass, detail: detail || "" });
   const line = `${pass ? "PASS" : "FAIL"}  ${name}${detail ? " — " + detail : ""}`;
   console.log(line);
+  writeResults();
   return !!pass;
 }
 
@@ -392,7 +439,9 @@ async function orderFlow(page, label) {
     const menu = document.querySelector("#menu-screen");
     return menu && !menu.hidden && document.querySelector("#ticket-total").textContent === "$4";
   });
-  check(label + " Edit Order keeps the ticket", true);
+  const keptTotal = await page.locator("#ticket-total").textContent();
+  const menuShown = await page.locator("#menu-screen").isVisible();
+  check(label + " Edit Order keeps the ticket", menuShown && keptTotal === "$4", keptTotal);
   await page.locator("#done-button").click();
   await page.waitForFunction(() => {
     const summary = document.querySelector("#summary-screen");
@@ -404,7 +453,9 @@ async function orderFlow(page, label) {
     const done = document.querySelector("#done-button");
     return menu && !menu.hidden && document.querySelector("#ticket-total").textContent === "$0" && done.disabled;
   });
-  check(label + " New Order clears the ticket", true);
+  const clearedTotal = await page.locator("#ticket-total").textContent();
+  const doneDisabled = await page.locator("#done-button").isDisabled();
+  check(label + " New Order clears the ticket", clearedTotal === "$0" && doneDisabled, clearedTotal);
   check(label + " no page errors during the order", page.__errors.length === errorsBefore, page.__errors.slice(errorsBefore).join(" | "));
 }
 
@@ -604,7 +655,8 @@ async function runSubfolder(browser, browserName) {
     await page.locator("#done-button").click();
     await page.locator("#new-order").click();
     await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$0");
-    check(label + " offline order flow", true);
+    const offlineTotal = await page.locator("#ticket-total").textContent();
+    check(label + " offline order flow", offlineTotal === "$0", offlineTotal);
   }
   check(label + " no page errors", page.__errors.length === 0, page.__errors.join(" | "));
   await context.close();
@@ -644,7 +696,8 @@ async function runLogic(browser, browserName) {
     }
   }
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$26");
-  check(browserName + " one of each snack totals $26", true);
+  const eachTotal = await page.locator("#ticket-total").textContent();
+  check(browserName + " one of each snack totals $26", eachTotal === "$26", eachTotal);
 
   await page.locator('.tab[data-category="food"]').click();
   for (let i = 0; i < 98; i++) {
@@ -658,7 +711,14 @@ async function runLogic(browser, browserName) {
   // 99 burgers ($297) plus the other eleven snacks ($23) = $320.
   // Burger was already counted once in the $26, so 98 more is +$294, total $320.
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$320");
-  check(browserName + " plus stops at 99", true);
+  const cappedQty = await page.locator('.ticket-row[data-id="burger"] .qty-number').textContent();
+  const plusDisabled = await page.locator('[data-action="plus"][data-id="burger"]').isDisabled();
+  const cappedTotal = await page.locator("#ticket-total").textContent();
+  check(
+    browserName + " plus stops at 99",
+    cappedQty === "99" && plusDisabled && cappedTotal === "$320",
+    cappedQty + " " + cappedTotal
+  );
 
   await page.locator('[data-action="minus"][data-id="burger"]').click();
   await page.locator("#done-button").click();
@@ -682,7 +742,8 @@ async function runLogic(browser, browserName) {
   });
   await page.locator('.menu-item[data-id="burger"]').click();
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
-  check(browserName + " a throwing play() still adds the snack", true);
+  const thrownTotal = await page.locator("#ticket-total").textContent();
+  check(browserName + " a throwing play() still adds the snack", thrownTotal === "$3", thrownTotal);
   check(browserName + " logic checks no page errors", page.__errors.length === 0, page.__errors.join(" | "));
   await context.close();
 }
@@ -717,7 +778,8 @@ async function runFilePage(browser, browserName) {
       return 0;
     }
   });
-  check(browserName + " file:// order still works", true);
+  const fileTotal = await page.locator("#ticket-total").textContent();
+  check(browserName + " file:// order still works", fileTotal === "$3", fileTotal);
   check(browserName + " file:// does not register a service worker", regs === 0, "registrations " + regs);
   await context.close();
 }
@@ -739,7 +801,7 @@ async function runReviewChecks(browser, browserName) {
   );
   check(label + " precached files exclude the docs", docsCached.length === 0, docsCached.join(", "));
 
-  const cssPath = join(ROOT, "styles.css");
+  const cssPath = appFile("styles.css");
   const originalCss = readFileSync(cssPath, "utf8");
   writeFileSync(cssPath, originalCss + "\n/* updated-marker */\n");
   let fresh;
@@ -756,8 +818,8 @@ async function runReviewChecks(browser, browserName) {
     writeFileSync(cssPath, originalCss);
   }
   check(
-    label + " network-first serves a newer file when online",
-    fresh.text.indexOf("updated-marker") !== -1 && fresh.savedText.indexOf("updated-marker") !== -1,
+    label + " network-first shows a newer file and leaves the snapshot",
+    fresh.text.indexOf("updated-marker") !== -1 && fresh.savedText.indexOf("updated-marker") === -1,
     fresh.text.slice(0, 80)
   );
 
@@ -861,7 +923,7 @@ async function runHostChecks(page, context, server, base, label) {
   server.clearPortal();
   await page.goto(base, { waitUntil: "load" });
 
-  const htmlPath = join(ROOT, "index.html");
+  const htmlPath = appFile("index.html");
   const originalHtml = readFileSync(htmlPath, "utf8");
   writeFileSync(htmlPath, originalHtml + "\n<!-- fresh-page-marker -->\n");
   let fresh;
@@ -872,20 +934,22 @@ async function runHostChecks(page, context, server, base, label) {
       const cache = await caches.open("snack-shack-1");
       const savedHome = await (await cache.match("./")).text();
       const savedFile = await (await cache.match("index.html")).text();
-      const good = (text) =>
+      const shown = (text) =>
         text.indexOf("fresh-page-marker") !== -1 && text.indexOf('name="snack-shack-page"') !== -1;
+      const saved = (text) =>
+        text.indexOf("fresh-page-marker") === -1 && text.indexOf('name="snack-shack-page"') !== -1;
       return {
-        home: good(home),
-        file: good(file),
-        savedHome: good(savedHome),
-        savedFile: good(savedFile)
+        home: shown(home),
+        file: shown(file),
+        savedHome: saved(savedHome),
+        savedFile: saved(savedFile)
       };
     });
   } finally {
     writeFileSync(htmlPath, originalHtml);
   }
   check(
-    label + " a real page with the marker updates the cache",
+    label + " a real page is shown and the snapshot stays unchanged",
     fresh.home && fresh.file && fresh.savedHome && fresh.savedFile,
     JSON.stringify(fresh)
   );
@@ -998,7 +1062,7 @@ async function runPortalAndHang(page, context, label) {
   }
   check(label + " the app still renders offline after a captive portal", offlineBurger > 0, "burgers " + offlineBurger);
 
-  const swPath = join(ROOT, "sw.js");
+  const swPath = appFile("sw.js");
   const originalSw = readFileSync(swPath, "utf8");
   writeFileSync(swPath, originalSw + "\n// install-bad-test\n");
   rootServer.portal("install-bad");
@@ -1159,7 +1223,7 @@ async function updateAndSettle(page, timeoutMs) {
 
 // A page that arrives after the 3 second fallback must not be saved.
 async function runLateNavigation(page, label) {
-  const indexPath = join(ROOT, "index.html");
+  const indexPath = appFile("index.html");
   const original = readFileSync(indexPath, "utf8");
   writeFileSync(indexPath, original.replace("<title>", "<!-- late-page-v2 --><title>"));
   rootServer.delay("/", 6000);
@@ -1215,8 +1279,11 @@ async function runReleaseChecks(browser, browserName) {
   const origin = new URL(BASE).origin;
   page.__errors = track(page, origin);
   const label = browserName + " release";
-  const swPath = join(ROOT, "sw.js");
+  const swPath = appFile("sw.js");
   const original = readFileSync(swPath, "utf8");
+  const originalApp = readFileSync(appFile("app.js"), "utf8");
+  const originalMenu = readFileSync(appFile("menu.js"), "utf8");
+  const originalCookie = readFileSync(appFile("assets/food/cookie.svg"), "utf8");
   try {
     await page.goto(BASE, { waitUntil: "load" });
     await waitForCache(page);
@@ -1279,6 +1346,9 @@ async function runReleaseChecks(browser, browserName) {
     await page.locator('.menu-item[data-id="burger"]').click();
     await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
 
+    writeFileSync(appFile("app.js"), originalApp + "\n/* v2-app */\n");
+    writeFileSync(appFile("menu.js"), originalMenu + "\n/* v2-menu */\n");
+    writeFileSync(appFile("assets/food/cookie.svg"), originalCookie + "<!-- v2-cookie -->");
     writeFileSync(
       swPath,
       original.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // release-ok')
@@ -1299,6 +1369,35 @@ async function runReleaseChecks(browser, browserName) {
       waiting.stillHere === 1 && waiting.total === "$3",
       JSON.stringify({ stillHere: waiting.stillHere, total: waiting.total })
     );
+
+    await context.setOffline(true);
+    let waitingSnap;
+    try {
+      waitingSnap = await readReleaseFiles(page);
+    } finally {
+      await context.setOffline(false);
+    }
+    const oldFetched = releaseMarks(waitingSnap.app, waitingSnap.menu, waitingSnap.cookie);
+    const oldCached = releaseMarks(waitingSnap.v1app, waitingSnap.v1menu, waitingSnap.v1cookie);
+    const newCached = releaseMarks(waitingSnap.v2app, waitingSnap.v2menu, waitingSnap.v2cookie);
+    check(
+      label + " offline is all old while v2 waits, and v2's cache is all new",
+      !oldFetched.app && !oldFetched.menu && !oldFetched.cookie &&
+        !oldCached.app && !oldCached.menu && !oldCached.cookie &&
+        newCached.app && newCached.menu && newCached.cookie,
+      JSON.stringify({ oldFetched: oldFetched, oldCached: oldCached, newCached: newCached })
+    );
+
+    // v2 is waiting, so it has not activated yet. Plant a newer release
+    // and an older side cache. Activate should drop only the older ones.
+    await page.evaluate(async () => {
+      const newer = await caches.open("snack-shack-3");
+      await newer.put("newer.txt", new Response("keep-newer"));
+      const installing = await caches.open("snack-shack-3-installing");
+      await installing.put("installing.txt", new Response("keep-installing"));
+      const olderSide = await caches.open("snack-shack-1-installing");
+      await olderSide.put("old-side.txt", new Response("drop-me"));
+    });
 
     await page.close();
     for (const extra of context.pages()) {
@@ -1324,6 +1423,26 @@ async function runReleaseChecks(browser, browserName) {
       await sleep(200);
     }
     const burgers = await page.locator('.menu-item[data-id="burger"]').count();
+    const kept = await page.evaluate(async () => {
+      const names = await caches.keys();
+      async function texts(name) {
+        if (names.indexOf(name) === -1) {
+          return [];
+        }
+        const cache = await caches.open(name);
+        const keys = await cache.keys();
+        const out = [];
+        for (let i = 0; i < keys.length; i++) {
+          const hit = await cache.match(keys[i]);
+          out.push((hit ? await hit.text() : "") + " @ " + keys[i].url);
+        }
+        return out;
+      }
+      return {
+        newer: await texts("snack-shack-3"),
+        installing: await texts("snack-shack-3-installing")
+      };
+    });
     check(
       label + " after every tab is closed the v2 worker is active on its own cache",
       after.active === "activated" &&
@@ -1331,25 +1450,204 @@ async function runReleaseChecks(browser, browserName) {
         after.controlled &&
         after.v2 >= appFiles.length &&
         after.names.indexOf("snack-shack-1") === -1 &&
+        after.names.indexOf("snack-shack-1-installing") === -1 &&
         after.names.indexOf("snack-shack-2") !== -1 &&
-        after.installingCache.length === 0 &&
         after.other === "keep-me" &&
         burgers > 0,
       JSON.stringify(after) + " burgers " + burgers
     );
+    check(
+      label + " activate deletes older copies and keeps a newer install",
+      after.names.indexOf("snack-shack-1") === -1 &&
+        after.names.indexOf("snack-shack-1-installing") === -1 &&
+        after.names.indexOf("snack-shack-3") !== -1 &&
+        after.names.indexOf("snack-shack-3-installing") !== -1 &&
+        kept.newer.join(" ").indexOf("keep-newer") !== -1,
+      JSON.stringify({ names: after.names, kept: kept })
+    );
+    await context.setOffline(true);
+    let activeSnap;
+    try {
+      await page.reload({ waitUntil: "load" });
+      activeSnap = await readReleaseFiles(page);
+    } finally {
+      await context.setOffline(false);
+    }
+    const activeFetched = releaseMarks(activeSnap.app, activeSnap.menu, activeSnap.cookie);
+    check(
+      label + " offline is all new after v2 takes over",
+      activeFetched.app && activeFetched.menu && activeFetched.cookie && activeSnap.v1app === "",
+      JSON.stringify(activeFetched)
+    );
     check(label + " no page errors", page.__errors.length === 0, page.__errors.join(" | "));
   } finally {
     writeFileSync(swPath, original);
+    writeFileSync(appFile("app.js"), originalApp);
+    writeFileSync(appFile("menu.js"), originalMenu);
+    writeFileSync(appFile("assets/food/cookie.svg"), originalCookie);
     rootServer.clearPortal();
+    await context.close();
+  }
+}
+
+function releaseMarks(app, menu, cookie) {
+  return {
+    app: app.indexOf("/* v2-app */") !== -1,
+    menu: menu.indexOf("/* v2-menu */") !== -1,
+    cookie: cookie.indexOf("<!-- v2-cookie -->") !== -1
+  };
+}
+
+async function readReleaseFiles(page) {
+  return page.evaluate(async () => {
+    async function body(path) {
+      try {
+        const res = await fetch(path);
+        return await res.text();
+      } catch (err) {
+        return "";
+      }
+    }
+    async function saved(name, path) {
+      const names = await caches.keys();
+      if (names.indexOf(name) === -1) {
+        return "";
+      }
+      const cache = await caches.open(name);
+      const hit = await cache.match(path);
+      return hit ? await hit.text() : "";
+    }
+    return {
+      app: await body("app.js"),
+      menu: await body("menu.js"),
+      cookie: await body("assets/food/cookie.svg"),
+      v1app: await saved("snack-shack-1", "app.js"),
+      v1menu: await saved("snack-shack-1", "menu.js"),
+      v1cookie: await saved("snack-shack-1", "assets/food/cookie.svg"),
+      v2app: await saved("snack-shack-2", "app.js"),
+      v2menu: await saved("snack-shack-2", "menu.js"),
+      v2cookie: await saved("snack-shack-2", "assets/food/cookie.svg")
+    };
+  });
+}
+
+// Files change, the version number does not. The installed snapshot stays.
+async function runNoBump(browser, browserName) {
+  const context = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    serviceWorkers: "allow"
+  });
+  const page = await context.newPage();
+  page.__errors = track(page, new URL(BASE).origin);
+  const label = browserName + " no bump";
+  const swPath = appFile("sw.js");
+  const originalSw = readFileSync(swPath, "utf8");
+  const originalApp = readFileSync(appFile("app.js"), "utf8");
+  const originalMenu = readFileSync(appFile("menu.js"), "utf8");
+  const originalCookie = readFileSync(appFile("assets/food/cookie.svg"), "utf8");
+  try {
+    await page.goto(BASE, { waitUntil: "load" });
+    await waitForCache(page);
+    writeFileSync(appFile("app.js"), originalApp + "\n/* nobump-app */\n");
+    writeFileSync(appFile("menu.js"), originalMenu + "\n/* nobump-menu */\n");
+    writeFileSync(appFile("assets/food/cookie.svg"), originalCookie + "<!-- nobump-cookie -->");
+    writeFileSync(swPath, originalSw + "\n// nobump-comment\n");
+    const state = await updateAndSettle(page, 20000);
+    const waiting = await workerSnapshot(page);
+    await context.setOffline(true);
+    let snap;
+    try {
+      snap = await readReleaseFiles(page);
+    } finally {
+      await context.setOffline(false);
+    }
+    const fetched = {
+      app: snap.app.indexOf("/* nobump-app */") !== -1,
+      menu: snap.menu.indexOf("/* nobump-menu */") !== -1,
+      cookie: snap.cookie.indexOf("<!-- nobump-cookie -->") !== -1
+    };
+    const cached = {
+      app: snap.v1app.indexOf("/* nobump-app */") !== -1,
+      menu: snap.v1menu.indexOf("/* nobump-menu */") !== -1,
+      cookie: snap.v1cookie.indexOf("<!-- nobump-cookie -->") !== -1
+    };
+    check(
+      label + " a same-number install waits and leaves the old snapshot",
+      state === "installed" &&
+        waiting.waiting === "installed" &&
+        waiting.v2 === -1 &&
+        !fetched.app && !fetched.menu && !fetched.cookie &&
+        !cached.app && !cached.menu && !cached.cookie &&
+        snap.v1app.indexOf("SNACK SHACK") !== -1 &&
+        snap.v1menu.indexOf("var MENU") !== -1,
+      state + " " + JSON.stringify({ fetched: fetched, cached: cached, waiting: waiting.waiting, v2: waiting.v2 })
+    );
+  } finally {
+    writeFileSync(swPath, originalSw);
+    writeFileSync(appFile("app.js"), originalApp);
+    writeFileSync(appFile("menu.js"), originalMenu);
+    writeFileSync(appFile("assets/food/cookie.svg"), originalCookie);
     await context.close();
   }
 }
 
 // First visit, with no saved copy yet. A portal mid-install must fail
 // clean, and the next normal visit must then work offline.
-async function runPartialFirstInstall(browser, browserName, server, base, label) {
-  const swPath = join(ROOT, "sw.js");
+// Same CACHE_VERSION, but APP_FILES now names a file that is not there.
+// The failed install must leave snack-shack-1 in place.
+async function runSameVersionFailure(browser, browserName) {
+  const context = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    serviceWorkers: "allow"
+  });
+  const page = await context.newPage();
+  page.__errors = track(page, new URL(BASE).origin);
+  const label = browserName + " same version";
+  const swPath = appFile("sw.js");
   const original = readFileSync(swPath, "utf8");
+  try {
+    await page.goto(BASE, { waitUntil: "load" });
+    await waitForCache(page);
+    const before = await workerSnapshot(page);
+    writeFileSync(
+      swPath,
+      original.replace(
+        '"assets/icons/icon-512.png"\n];',
+        '"assets/icons/icon-512.png",\n  "assets/food/taco.svg"\n]; // same-version-missing'
+      )
+    );
+    const state = await updateAndSettle(page, 20000);
+    const after = await workerSnapshot(page);
+    check(
+      label + " a failed install keeps the live cache",
+      state === "redundant" &&
+        after.v1core &&
+        after.v1 >= appFiles.length &&
+        after.v1 === before.v1 &&
+        after.names.indexOf("snack-shack-1") !== -1 &&
+        after.installingCache.length === 0,
+      state + " before " + before.v1 + " after " + JSON.stringify(after)
+    );
+    await context.setOffline(true);
+    let burgers = 0;
+    try {
+      await page.reload({ waitUntil: "load" });
+      burgers = await page.locator('.menu-item[data-id="burger"]').count();
+    } finally {
+      await context.setOffline(false);
+    }
+    check(
+      label + " offline still works after that failed install",
+      burgers > 0 && (await workerSnapshot(page)).v1core,
+      "burgers " + burgers
+    );
+  } finally {
+    writeFileSync(swPath, original);
+    await context.close();
+  }
+}
+
+async function runPartialFirstInstall(browser, browserName, server, base, label) {
   const context = await browser.newContext({
     viewport: { width: 1024, height: 768 },
     serviceWorkers: "allow"
@@ -1410,7 +1708,6 @@ async function runPartialFirstInstall(browser, browserName, server, base, label)
     );
 
     server.clearPortal();
-    writeFileSync(swPath, original + "\n// retry-after-portal\n");
     await page.goto(base, { waitUntil: "load" });
     await waitForCache(page);
     await context.setOffline(true);
@@ -1429,16 +1726,58 @@ async function runPartialFirstInstall(browser, browserName, server, base, label)
     );
   } finally {
     server.clearPortal();
-    writeFileSync(swPath, original);
     await context.close();
   }
 }
 
+function copyApp() {
+  const dest = mkdtempSync(join(tmpdir(), "snack-shack-"));
+  cpSync(ROOT, dest, {
+    recursive: true,
+    filter(src) {
+      const rel = relative(ROOT, src);
+      if (!rel) {
+        return true;
+      }
+      if (rel === ".git" || rel.startsWith(".git" + "/")) {
+        return false;
+      }
+      if (rel.split("/").indexOf("node_modules") !== -1) {
+        return false;
+      }
+      if (rel === "tests/results" || rel.startsWith("tests/results/")) {
+        return false;
+      }
+      return true;
+    }
+  });
+  return dest;
+}
+
+async function guard(name, fn) {
+  try {
+    await fn();
+  } catch (err) {
+    const text = err && err.stack ? String(err.stack) : String(err);
+    check(name + " did not finish", false, text.split("\n").slice(0, 3).join(" "));
+  } finally {
+    if (rootServer) {
+      rootServer.clearPortal();
+      rootServer.clearDelay();
+    }
+    if (subServer) {
+      subServer.clearPortal();
+      subServer.clearDelay();
+    }
+  }
+}
+
 async function main() {
-  await mkdirAsync(ARTIFACTS, { recursive: true });
+  rmSync(join(ARTIFACTS, "playwright_results.txt"), { force: true });
   await rmAsync(HOST_DIR, { recursive: true, force: true });
   await mkdirAsync(HOST_DIR, { recursive: true });
-  await symlinkAsync(ROOT, join(HOST_DIR, "SnackShack"));
+  appDir = copyApp();
+  await symlinkAsync(appDir, join(HOST_DIR, "SnackShack"));
 
   const docFiles = [
     "assets/STYLE.md",
@@ -1490,9 +1829,19 @@ async function main() {
     swSource.indexOf('var CACHE_VERSION = "1"') !== -1 &&
       swSource.indexOf('var CACHE_NAME = "snack-shack-" + CACHE_VERSION') !== -1 &&
       swSource.indexOf('var INSTALL_CACHE = CACHE_NAME + "-installing"') !== -1 &&
+      swSource.indexOf("function isOlderCopy(name)") !== -1 &&
+      swSource.indexOf("return caches.delete(INSTALL_CACHE);") !== -1 &&
+      swSource.indexOf("caches.delete(CACHE_NAME)") === -1 &&
+      swSource.indexOf("cache.addAll") === -1 &&
+      swSource.indexOf("Always count up") !== -1 &&
       swSource.indexOf("skipWaiting()") === -1 &&
       swSource.indexOf("/.netlify/") === -1 &&
-      swSource.indexOf("Drop this later") !== -1
+      swSource.indexOf("Drop this later") !== -1 &&
+      swSource.indexOf("function remember") === -1 &&
+      swSource.indexOf("Only install writes") !== -1 &&
+      readme.indexOf("always count up: 1, 2, 3") !== -1 &&
+      readme.indexOf("ordinary edit") === -1 &&
+      readme.indexOf("Netlify") === -1
   );
   check("repo has an empty .nojekyll", statSync(join(ROOT, ".nojekyll")).isFile() && statSync(join(ROOT, ".nojekyll")).size === 0);
   check(
@@ -1504,7 +1853,7 @@ async function main() {
       css.includes("env(safe-area-inset-top)")
   );
 
-  rootServer = startServer(ROOT, PORT);
+  rootServer = startServer(appDir, PORT);
   subServer = startServer(HOST_DIR, SUB_PORT);
   await waitForHttp(BASE);
   await waitForHttp(SUB_BASE);
@@ -1527,25 +1876,27 @@ async function main() {
     try {
       if (!reviewOnly && !releaseOnly) {
         for (const [width, height] of sizes) {
-          await runSize(browser, name, width, height);
+          await guard(name + " " + width + "x" + height, () => runSize(browser, name, width, height));
         }
       }
       if (!releaseOnly) {
-        await runReviewChecks(browser, name);
+        await guard(name + " review", () => runReviewChecks(browser, name));
       }
-      await runReleaseChecks(browser, name);
-      await runPartialFirstInstall(browser, name, rootServer, BASE, name + " first install");
-      await runPartialFirstInstall(browser, name, subServer, SUB_BASE, name + " first install /SnackShack/");
+      await guard(name + " release", () => runReleaseChecks(browser, name));
+      await guard(name + " no bump", () => runNoBump(browser, name));
+      await guard(name + " same version", () => runSameVersionFailure(browser, name));
+      await guard(name + " first install", () => runPartialFirstInstall(browser, name, rootServer, BASE, name + " first install"));
+      await guard(name + " first install subfolder", () => runPartialFirstInstall(browser, name, subServer, SUB_BASE, name + " first install /SnackShack/"));
       if (reviewOnly || releaseOnly) {
         continue;
       }
-      await runPictureNote(browser, name);
-      await runSubfolder(browser, name);
-      await runLogic(browser, name);
+      await guard(name + " picture", () => runPictureNote(browser, name));
+      await guard(name + " subfolder", () => runSubfolder(browser, name));
+      await guard(name + " logic", () => runLogic(browser, name));
       if (name === "chromium") {
         const fileBrowser = await chromium.launch({ args: ["--allow-file-access-from-files"] });
         try {
-          await runFilePage(fileBrowser, name);
+          await guard(name + " file", () => runFilePage(fileBrowser, name));
         } finally {
           await fileBrowser.close();
         }
@@ -1559,27 +1910,30 @@ async function main() {
 
   const passed = results.filter((item) => item.pass).length;
   const failed = results.filter((item) => !item.pass).length;
-  const summary = [
-    `Snack Shack issue #5 Playwright results`,
-    `Passed: ${passed}`,
-    `Failed: ${failed}`,
-    `Browsers: Chromium and WebKit`,
-    `Viewports: 1024x768, 1180x820, 768x1024, 844x390`,
-    `Also: subfolder /SnackShack/, offline reload, network-first, 3s hang, hung page load, captive portal, partial install, per-release update, late page, real 404, page marker, host headers, query offline, manifest, icons, B3, B4`,
-    ``,
-    ...results.map((item) => `${item.pass ? "PASS" : "FAIL"}  ${item.name}${item.detail ? " — " + item.detail : ""}`)
-  ].join("\n");
-  writeFileSync(join(ARTIFACTS, "playwright_results.txt"), summary + "\n");
+  writeResults();
   console.log(`\n${passed} passed, ${failed} failed`);
 
-  rootServer.kill();
-  subServer.kill();
+  if (rootServer) {
+    rootServer.kill();
+  }
+  if (subServer) {
+    subServer.kill();
+  }
+  rmSync(appDir, { recursive: true, force: true });
   if (failed > 0) {
     process.exit(1);
   }
 }
 
 main().catch((err) => {
+  check("suite crashed", false, err && err.stack ? String(err.stack) : String(err));
+  writeResults();
   console.error(err);
+  if (rootServer) {
+    rootServer.kill();
+  }
+  if (subServer) {
+    subServer.kill();
+  }
   process.exit(1);
 });

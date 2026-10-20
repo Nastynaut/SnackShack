@@ -24,6 +24,12 @@ npx playwright install chromium webkit
 node verify.mjs
 ```
 
-`verify.mjs` starts its own servers on `127.0.0.1:8765` and `127.0.0.1:8766`. The second one opens the app at `/SnackShack/`. You do not need the Python server for these checks.
+`verify.mjs` copies the app to a temp folder and serves that copy. It does not edit the repo. Servers listen on `127.0.0.1:8765` and `127.0.0.1:8766`. The second one opens the app at `/SnackShack/`. You do not need the Python server for these checks.
 
-Results are written to `/opt/cursor/artifacts/playwright_results.txt` when that folder can be created. A failing check exits with status 1.
+Results are written to `tests/results/`. Set `SNACK_RESULTS_DIR` to write them somewhere else:
+
+```
+SNACK_RESULTS_DIR=/tmp/snack-results node verify.mjs
+```
+
+A failing check exits with status 1.
