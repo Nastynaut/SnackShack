@@ -91,3 +91,16 @@ All viewBox `0 0 128 128`, 6px rounded `#2B1D3A` outline, flat fills, smiley fac
 
 ## Accessibility
 Text ≥ 4.5:1; real `<button>`s; icon-only buttons get `aria-label`s; don't rely on color alone (pair colors with words + icons); announce ticket changes with `aria-live="polite"`; sounds are optional and never carry essential info.
+
+## App icon
+iPad home-screen icon. The source is `assets/icons/app-icon.svg` (512 viewBox, full-bleed cream `#FFF8EC`). Raster files:
+
+- `assets/icons/apple-touch-icon-180.png` — 180×180. iOS needs a non-transparent apple-touch icon, so this PNG is flattened RGB with no alpha channel.
+- `assets/icons/icon-192.png` — 192×192, opaque RGB.
+- `assets/icons/icon-512.png` — 512×512, opaque RGB.
+
+Suggested HTML only:
+
+```html
+<link rel="apple-touch-icon" href="assets/icons/apple-touch-icon-180.png">
+```
