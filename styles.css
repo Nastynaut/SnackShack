@@ -48,7 +48,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* The page itself does not bounce. The menu and the ticket still scroll. */
   overscroll-behavior: none;
-  /* Limits accidental double-tap zoom. Pinch zoom is blocked in app.js. */
+  /* Limits accidental double-tap zoom. Pinch zoom is blocked on iOS on purpose, in app.js, because this is a kids' app and it prevents accidental zoom. */
   touch-action: manipulation;
 }
 

@@ -6,7 +6,8 @@
   <meta name="snack-shack-page" content="yes">
   <!--
     Fit the iPad screen. viewport-fit=cover lets us pad around the
-    rounded corners. This tag does not lock zoom.
+    rounded corners. Pinch zoom is blocked on iOS on purpose, in
+    app.js, because this is a kids' app and it prevents accidental zoom.
   -->
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <!-- These tell Safari that Add to Home Screen should open like an app. -->
@@ -28,6 +29,8 @@
     assets/icons/apple-touch-icon-180.png
   -->
   <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon-180.png">
+  <!-- So the browser does not ask for /favicon.ico and get a 404. -->
+  <link rel="icon" href="assets/icons/icon-192.png">
   <!--
     Our own stylesheet is the whole look. It does not load anything
     from the internet. Fredoka and Nunito come in through tokens.css,

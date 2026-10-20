@@ -527,13 +527,18 @@
         // Not loaded enough to rewind yet. Playing still starts at 0.
       }
 
-      var pending = audio.play();
-      if (pending && pending.catch) {
-        pending.catch(function () {
-          if (audio.error) {
-            available = false;
-          }
-        });
+      // A throw or a rejected play must not stop the snack landing.
+      try {
+        var pending = audio.play();
+        if (pending && pending.catch) {
+          pending.catch(function () {
+            if (audio.error) {
+              available = false;
+            }
+          });
+        }
+      } catch (err) {
+        available = false;
       }
     }
 
@@ -543,8 +548,8 @@
   var playAdd = makeSound("assets/sounds/add.mp3");
   var playCheckout = makeSound("assets/sounds/checkout.mp3");
 
-  // Blocks pinch zoom on iOS. Kids pinch by accident while they tap
-  // snacks, and the home-screen request asked us to keep the page still.
+  // Blocks pinch zoom on iOS. This is a kids' app, and blocking pinch
+  // prevents accidental zoom. That block is intended.
   document.addEventListener("gesturestart", function (event) {
     event.preventDefault();
   });

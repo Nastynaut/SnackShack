@@ -14,7 +14,7 @@ It is laid out for a tablet held sideways (landscape), around 1024Ã—768 or 1280Ã
 
 ### Turn on GitHub Pages
 
-This serves the `main` branch from the root of the repo. Dustin is turning it on now. The repo needs to be public.
+This serves the `main` branch from the root of the repo. The repo needs to be public.
 
 1. Open the repo in a browser.
 2. Click **Settings**.
@@ -36,7 +36,7 @@ Netlify is an optional host. Its free plan adds a badge over the app.
 5. The name is **Snack Shack**. Tap **Add**.
 6. Open **Snack Shack** from the home screen **once while the iPad is online**.
 
-After that one online open, turn on airplane mode. The app still opens full screen, and the whole order works. It stays held sideways when Rotation Lock is on. Adding a snack and tapping **Done** still play their sounds. The home-screen picture is the Snack Shack icon already in this project.
+After that one online open, turn on airplane mode. The app still opens full screen, and the whole order works. It stays held sideways when Rotation Lock is on. Pinch zoom is blocked on iOS on purpose, because this is a kids' app and it prevents accidental zoom. Adding a snack and tapping **Done** still play their sounds. The home-screen picture is the Snack Shack icon already in this project.
 
 ### After you change a file
 
@@ -44,7 +44,7 @@ GitHub Pages caches files for up to 10 minutes, so after a change is merged it c
 
 To lock orientation, use iPad Rotation Lock in Control Center.
 
-`CACHE_VERSION` in `sw.js` is only a switch that wipes the saved copy. You do not need to change it for an ordinary edit. Change the name (for example from `snack-shack-1` to `snack-shack-2`) only when that saved copy is wrong and the iPad should forget it. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file. Keep the path relative, with no slash at the start.
+`CACHE_VERSION` in `sw.js` is the number on the saved copy (`1` makes a cache named `snack-shack-1`). You do not need to change it for an ordinary edit. Change the number (for example from `1` to `2`) only when that saved copy is wrong and the iPad should forget it. The new copy gets its own cache. The old one is dropped when the app is closed and opened again. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file. Keep the path relative, with no slash at the start.
 
 ### Try it on your computer
 
