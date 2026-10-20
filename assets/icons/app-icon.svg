@@ -3,26 +3,26 @@
   <rect width="512" height="512" fill="#FFF8EC"/>
   <defs>
     <clipPath id="app-icon-awning-clip">
-      <path d="M76 112q0-28 28-28h304q28 0 28 28v62a36 36 0 0 1-72 0 36 36 0 0 1-72 0 36 36 0 0 1-72 0 36 36 0 0 1-72 0 36 36 0 0 1-72 0z"/>
+      <path d="M116 94q0-28 28-28h224q28 0 28 28v62a28 12 0 0 1-56 0 28 12 0 0 1-56 0 28 12 0 0 1-56 0 28 12 0 0 1-56 0 28 12 0 0 1-56 0z"/>
     </clipPath>
   </defs>
   <g clip-path="url(#app-icon-awning-clip)">
-    <rect x="64" y="72" width="384" height="200" fill="#FF7A45"/>
-    <rect x="148" y="72" width="72" height="200" fill="#FFFFFF"/>
-    <rect x="292" y="72" width="72" height="200" fill="#FFFFFF"/>
+    <rect x="100" y="50" width="312" height="160" fill="#FF7A45"/>
+    <rect x="172" y="50" width="56" height="160" fill="#FFFFFF"/>
+    <rect x="284" y="50" width="56" height="160" fill="#FFFFFF"/>
   </g>
-  <path fill="none" stroke="#2B1D3A" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" d="M76 112q0-28 28-28h304q28 0 28 28v62a36 36 0 0 1-72 0 36 36 0 0 1-72 0 36 36 0 0 1-72 0 36 36 0 0 1-72 0 36 36 0 0 1-72 0z"/>
-  <g fill="none" stroke="#2B1D3A" stroke-linecap="round" stroke-linejoin="round" stroke-width="8.4" transform="translate(256 318) scale(2.85) translate(-64 -68)">
+  <path fill="none" stroke="#2B1D3A" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" d="M116 94q0-28 28-28h224q28 0 28 28v62a28 12 0 0 1-56 0 28 12 0 0 1-56 0 28 12 0 0 1-56 0 28 12 0 0 1-56 0 28 12 0 0 1-56 0z"/>
+  <g fill="none" stroke="#2B1D3A" stroke-linecap="round" stroke-linejoin="round" stroke-width="8.4" transform="translate(256 334) scale(2.85) translate(-64 -68)">
     <path fill="#FFD23F" d="M18 88h92v6q0 14-14 14H32q-14 0-14-14Z"/>
     <rect width="100" height="18" x="14" y="72" fill="#B23C0C" rx="9"/>
     <path fill="#3FBF5F" d="M12 66q8 16 18 6 10 12 20 0 10 12 20 0 10 12 20 0 10 12 18 0 10 6 8-6Z"/>
     <path fill="#FFD23F" d="M16 62q0-38 48-38t48 38q0 4-4 4H20q-4 0-4-4"/>
-    <ellipse cx="42" cy="49" fill="#FF8FC0" fill-opacity=".9" stroke="none" rx="7.2" ry="4.4"/>
-    <ellipse cx="86" cy="49" fill="#FF8FC0" fill-opacity=".9" stroke="none" rx="7.2" ry="4.4"/>
-    <circle cx="55" cy="40" r="6.4" fill="#2B1D3A" stroke="none"/>
-    <circle cx="57.2" cy="37.8" r="2.2" fill="#FFFFFF" stroke="none"/>
-    <circle cx="73" cy="40" r="6.4" fill="#2B1D3A" stroke="none"/>
-    <circle cx="75.2" cy="37.8" r="2.2" fill="#FFFFFF" stroke="none"/>
-    <path stroke-width="7" d="M57 46q7 8 14 0"/>
+    <ellipse cx="49" cy="53" fill="#ff6f9c" fill-opacity=".55" stroke="none" rx="4.5" ry="3"/>
+    <ellipse cx="79" cy="53" fill="#ff6f9c" fill-opacity=".55" stroke="none" rx="4.5" ry="3"/>
+    <circle cx="55" cy="46" r="3.8" fill="#2B1D3A" stroke="none"/>
+    <circle cx="56.2" cy="44.7" r="1.3" fill="#FFFFFF" stroke="none"/>
+    <circle cx="73" cy="46" r="3.8" fill="#2B1D3A" stroke="none"/>
+    <circle cx="74.2" cy="44.7" r="1.3" fill="#FFFFFF" stroke="none"/>
+    <path stroke-width="4" d="M58 54.5q6 6 12 0"/>
   </g>
 </svg>
