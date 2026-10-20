@@ -2,8 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Keep this: the offline helper uses it to tell our page from a Wi-Fi login page. -->
+  <meta name="snack-shack-page" content="yes">
+  <!--
+    Fit the iPad screen. viewport-fit=cover lets us pad around the
+    rounded corners. Pinch zoom is blocked on iOS on purpose, in
+    app.js, because this is a kids' app and it prevents accidental zoom.
+  -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <!-- These tell Safari that Add to Home Screen should open like an app. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <!-- Light status bar, so the clock sits on the cream page. -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Snack Shack">
   <title>Snack Shack</title>
+  <!--
+    Home-screen settings. theme_color is --color-primary (#FF7A45)
+    and background_color is --color-background (#FFF8EC), both from
+    assets/tokens.css. The address is relative, so a folder such as
+    /SnackShack/ still works.
+  -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <!--
+    The iPad home-screen picture. Same file the style guide names:
+    assets/icons/apple-touch-icon-180.png
+  -->
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon-180.png">
+  <!-- So the browser does not ask for /favicon.ico and get a 404. -->
+  <link rel="icon" href="assets/icons/icon-192.png">
   <!--
     Our own stylesheet is the whole look. It does not load anything
     from the internet. Fredoka and Nunito come in through tokens.css,

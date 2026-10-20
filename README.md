@@ -4,14 +4,57 @@ Snack Shack is a pretend-play register for kids. One child runs the register. An
 
 ## Open it
 
-1. Copy this folder onto a tablet or a computer.
-2. Open `index.html` in a web browser.
+The iPad needs Snack Shack at a **web address**. Do not hand the tablet a folder of files. There is no build step.
 
-Double-click `index.html`, or tap it in the tablet's files app and choose a browser. The address will start with `file://`. That is expected. There is no install step and no build step.
+The app is on GitHub Pages at:
 
-It is laid out for a tablet held sideways (landscape), around 1024×768 or 1280×800. A wide laptop window works too.
+**https://nastynaut.github.io/SnackShack/**
 
-The page does not use the network. It works with Wi-Fi turned off.
+It is laid out for a tablet held sideways (landscape), around 1024×768 or 1280×800.
+
+### Turn on GitHub Pages
+
+This serves the `main` branch from the root of the repo. The repo needs to be public.
+
+1. Open the repo in a browser.
+2. Click **Settings**.
+3. In the left sidebar, click **Pages**.
+4. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+5. Set **Branch** to **main** and the folder to **/ (root)**.
+6. Click **Save**.
+
+The address is **https://nastynaut.github.io/SnackShack/**.
+
+### Add it to the iPad home screen
+
+1. On the iPad, open **Safari**.
+2. Go to **https://nastynaut.github.io/SnackShack/**
+3. Tap the **Share** button (the square with an arrow pointing up).
+4. Tap **Add to Home Screen**.
+5. The name is **Snack Shack**. Tap **Add**.
+6. Open **Snack Shack** from the home screen **once while the iPad is online**.
+
+After that one online open, turn on airplane mode. The app still opens full screen, and the whole order works. It stays held sideways when Rotation Lock is on. Pinch zoom is blocked on iOS on purpose, because this is a kids' app and it prevents accidental zoom. Adding a snack and tapping **Done** still play their sounds. The home-screen picture is the Snack Shack icon already in this project.
+
+### After you change a file
+
+GitHub Pages caches files for up to 10 minutes, so after a change is merged it can take about 10 minutes to show. After that, swipe the Snack Shack app closed, then open it again.
+
+To lock orientation, use iPad Rotation Lock in Control Center.
+
+`CACHE_VERSION` in `sw.js` is the number on the saved copy (`1` makes a cache named `snack-shack-1`). Every time you change an app file, always count up: 1, 2, 3. Never reuse a number, and never go back to a smaller one. A rollback ships as a new, higher number. Do not ship a file change on the same number. The new copy gets its own cache. The open tab keeps the older snapshot until the app is closed and opened again. Older copies are dropped then. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file and count the number up. Keep the path relative, with no slash at the start.
+
+### Try it on your computer
+
+A service worker does not run from a `file://` address, so double-clicking `index.html` is only a quick look at the register. To try the real app, including airplane mode, start a small local server in this folder:
+
+```
+python3 -m http.server 8000
+```
+
+Open `http://localhost:8000` in the browser. Stop the server with Ctrl+C when you are done.
+
+A new `sw.js` takes over only after the tab or window is closed and reopened. A reload keeps the copy that is already running.
 
 ## How to play
 
@@ -85,3 +128,5 @@ Fonts stay on the device. `assets/tokens.css` imports `assets/fonts/fonts.css`, 
 - `styles.css` — colors, sizes, and layout (works on its own)
 - `menu.js` — the snacks and prices
 - `app.js` — what happens when you tap
+- `manifest.webmanifest` — the home-screen name, colors, and icon paths
+- `sw.js` — the offline copy. Swipe the home-screen app closed and open it again to pick up a change.

@@ -43,6 +43,10 @@
   // A missing picture is requested only the first time.
   var pictureStatus = {};
 
+  // Lines already sitting in the yellow note. A picture that fails
+  // later is added to this same list.
+  var menuProblems = [];
+
   var menuScreen = document.getElementById("menu-screen");
   var summaryScreen = document.getElementById("summary-screen");
   var tabsEl = document.getElementById("category-tabs");
@@ -405,6 +409,18 @@
     note.hidden = false;
   }
 
+  // Add one sentence to the yellow note. Repeating the same sentence
+  // (the picture can error once per visit) does not stack copies.
+  function addMenuProblem(text) {
+    if (menuProblems.indexOf(text) !== -1) {
+      return;
+    }
+    menuProblems.push(text);
+    console.warn(text);
+    showMenuNotes(menuProblems);
+    refitTicket();
+  }
+
   function findCategory(id) {
     for (var i = 0; i < MENU.categories.length; i++) {
       if (MENU.categories[i].id === id) {
@@ -475,6 +491,8 @@
   }
 
   // Returns a play() function for one file.
+  // The ding plays inside the tap that added the snack, so iPad
+  // Safari allows it. No extra first-tap priming.
   function makeSound(src) {
     var audio = new Audio();
     var available = true;
@@ -487,7 +505,7 @@
     // Set src after the listener so a fast error is not missed.
     audio.src = src;
 
-    return function play() {
+    function play() {
       if (soundMuted || !available) {
         return;
       }
@@ -509,19 +527,47 @@
         // Not loaded enough to rewind yet. Playing still starts at 0.
       }
 
-      var pending = audio.play();
-      if (pending && pending.catch) {
-        pending.catch(function () {
-          if (audio.error) {
-            available = false;
-          }
-        });
+      // A throw or a rejected play must not stop the snack landing.
+      try {
+        var pending = audio.play();
+        if (pending && pending.catch) {
+          pending.catch(function () {
+            if (audio.error) {
+              available = false;
+            }
+          });
+        }
+      } catch (err) {
+        available = false;
       }
-    };
+    }
+
+    return play;
   }
 
   var playAdd = makeSound("assets/sounds/add.mp3");
   var playCheckout = makeSound("assets/sounds/checkout.mp3");
+
+  // Blocks pinch zoom on iOS. This is a kids' app, and blocking pinch
+  // prevents accidental zoom. That block is intended.
+  document.addEventListener("gesturestart", function (event) {
+    event.preventDefault();
+  });
+
+  // Save the page for airplane mode. file:// (a double-clicked
+  // index.html) cannot do this, and that is fine for a quick look.
+  function registerOfflineCopy() {
+    var protocol = window.location.protocol;
+    if (protocol !== "http:" && protocol !== "https:") {
+      return;
+    }
+    if (!navigator.serviceWorker) {
+      return;
+    }
+    navigator.serviceWorker.register("./sw.js").catch(function () {
+      // Saving failed. This visit still works online.
+    });
+  }
 
   function rememberMute() {
     try {
@@ -810,6 +856,11 @@
         pictureStatus[item.id] = "missing";
         img.hidden = true;
         emoji.hidden = false;
+        // The emoji stands in when a drawing is missing. With no emoji
+        // either, tell a grown-up in the same yellow note.
+        if (!textOf(item.emoji)) {
+          addMenuProblem(item.name + "'s picture didn't load.");
+        }
       });
       // Set src after the listeners, or a fast error can be missed.
       img.src = item.image;
@@ -1149,14 +1200,18 @@
   // ----------------------------------------------------------
 
   function init() {
+    // Do this even if the menu is broken, so the page can reopen offline.
+    registerOfflineCopy();
+
     var prepared = prepareMenu();
     // Swap in the cleaned copy. menu.js itself is not rewritten.
     window.MENU = { categories: prepared.categories };
+    menuProblems = prepared.problems.slice();
 
     if (prepared.failed) {
       // One sentence, in the yellow note. A second copy used to
       // sit at the top of the page as well.
-      showMenuNotes(prepared.problems);
+      showMenuNotes(menuProblems);
       return;
     }
 
@@ -1222,7 +1277,7 @@
     }
 
     // Yellow note when a price or id was skipped. Hidden when the menu is fine.
-    showMenuNotes(prepared.problems);
+    showMenuNotes(menuProblems);
 
     renderTabs();
     renderMenuGrid();
