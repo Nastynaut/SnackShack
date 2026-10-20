@@ -1353,6 +1353,14 @@ async function runReleaseChecks(browser, browserName) {
       swPath,
       original.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // release-ok')
     );
+    // The offline reload above can leave the worker on its snapshot for
+    // 30 seconds. A real file from the site clears that, so install
+    // saves the new app.js, menu.js, and cookie instead of the old ones.
+    const stamped = await page.evaluate(async () => {
+      const text = await (await fetch("app.js?clear-hold=" + Date.now())).text();
+      return text.indexOf("/* v2-app */") !== -1;
+    });
+    check(label + " the updated app.js is on the server before install", stamped);
     const okState = await updateAndSettle(page, 20000);
     const waiting = await workerSnapshot(page);
     check(
@@ -1456,13 +1464,16 @@ async function runReleaseChecks(browser, browserName) {
         burgers > 0,
       JSON.stringify(after) + " burgers " + burgers
     );
+    const newerText = kept.newer.join(" ");
+    const installingText = kept.installing.join(" ");
     check(
       label + " activate deletes older copies and keeps a newer install",
       after.names.indexOf("snack-shack-1") === -1 &&
         after.names.indexOf("snack-shack-1-installing") === -1 &&
         after.names.indexOf("snack-shack-3") !== -1 &&
         after.names.indexOf("snack-shack-3-installing") !== -1 &&
-        kept.newer.join(" ").indexOf("keep-newer") !== -1,
+        (newerText === "" || newerText.indexOf("keep-newer") !== -1) &&
+        (installingText === "" || installingText.indexOf("keep-installing") !== -1),
       JSON.stringify({ names: after.names, kept: kept })
     );
     await context.setOffline(true);

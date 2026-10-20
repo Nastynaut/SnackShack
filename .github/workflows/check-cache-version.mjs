@@ -1,22 +1,58 @@
-// Fails a pull request when an app file changed but CACHE_VERSION
-// did not go up. Install is the only writer of a release cache, so a
-// new snapshot needs the next number: 1, then 2, then 3.
+// Fails when an app file changed but CACHE_VERSION did not go up.
+// Install is the only writer of a release cache, so a new snapshot
+// needs the next number: 1, then 2, then 3.
 //
-// Usage (from the repo root):
+// Local use (from the repo root):
 //   node .github/workflows/check-cache-version.mjs origin/main HEAD
 //
-// The first argument is the base ref. The second is the head ref.
-// If the base has no sw.js, this passes. That is how the first
-// pull request, which adds the worker, gets through.
+// On GitHub, the workflow passes BASE_REF and BEFORE in the
+// environment instead of putting them on the command line.
+// A pull request sets BASE_REF. A push to main leaves BASE_REF
+// empty and sets BEFORE to the previous commit.
+// BEFORE is all zeros when the branch is new, and it can name a
+// commit this checkout does not have. Both of those skip cleanly.
 
 import { spawnSync } from "node:child_process";
 
-const baseRef = process.argv[2] || "origin/main";
 const headRef = process.argv[3] || "HEAD";
 
 function git(args) {
-  const result = spawnSync("git", args, { encoding: "utf8" });
-  return result;
+  return spawnSync("git", args, { encoding: "utf8" });
+}
+
+function refExists(ref) {
+  const result = git(["rev-parse", "--verify", "--quiet", ref + "^{commit}"]);
+  return result.status === 0 && result.stdout.trim() !== "";
+}
+
+// Pick the commit to compare against HEAD.
+function resolveBase() {
+  if (process.argv[2]) {
+    return process.argv[2];
+  }
+
+  const baseRef = (process.env.BASE_REF || "").trim();
+  if (baseRef) {
+    return "origin/" + baseRef;
+  }
+
+  // Push to main: no base branch. BEFORE is the previous commit.
+  if (process.env.GITHUB_ACTIONS === "true") {
+    const before = (process.env.BEFORE || "").trim();
+    // A brand-new branch is reported as all zeros. There is nothing older.
+    if (!before || /^0+$/.test(before)) {
+      console.log("Push has no previous commit (new branch). Skipping.");
+      process.exit(0);
+    }
+    // The previous commit can be missing after a force-push.
+    if (!refExists(before)) {
+      console.log("Previous commit " + before + " is not in this checkout. Skipping.");
+      process.exit(0);
+    }
+    return before;
+  }
+
+  return "origin/main";
 }
 
 function show(ref, path) {
@@ -28,7 +64,10 @@ function show(ref, path) {
 }
 
 function parseSw(source, label) {
-  const versionMatch = source.match(/var CACHE_VERSION = "(\d+)"/);
+  // Anchored to the real line, so a commented-out
+  //   // var CACHE_VERSION = "99";
+  // cannot win over the declaration below it.
+  const versionMatch = source.match(/^var CACHE_VERSION = "(\d+)";/m);
   if (!versionMatch) {
     console.error(label + " has no CACHE_VERSION number");
     process.exit(1);
@@ -45,6 +84,12 @@ function parseSw(source, label) {
     files.push(match[1] === "./" ? "index.html" : match[1]);
   }
   return { version: Number(versionMatch[1]), files: files };
+}
+
+const baseRef = resolveBase();
+if (!refExists(baseRef)) {
+  console.error("Base " + baseRef + " is not in this checkout.");
+  process.exit(1);
 }
 
 const baseSw = show(baseRef, "sw.js");
@@ -67,6 +112,13 @@ if (headInfo.version > baseInfo.version) {
     "CACHE_VERSION went from " + baseInfo.version + " to " + headInfo.version + "."
   );
   process.exit(0);
+}
+
+if (headInfo.version < baseInfo.version) {
+  console.error(
+    "CACHE_VERSION went down from " + baseInfo.version + " to " + headInfo.version + "."
+  );
+  process.exit(1);
 }
 
 const diff = git(["diff", "--name-only", baseRef, headRef]);

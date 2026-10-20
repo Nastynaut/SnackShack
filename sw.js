@@ -68,6 +68,23 @@ var APP_FILES = [
   "assets/food/pizza-slice.svg",
   "assets/food/soda.svg",
   "assets/food/water.svg",
+  // Option drawings. The options screen does not use them yet.
+  // They are saved now so that screen still works offline later.
+  "assets/options/cheese.svg",
+  "assets/options/chocolate.svg",
+  "assets/options/ice.svg",
+  "assets/options/ketchup.svg",
+  "assets/options/lettuce.svg",
+  "assets/options/mayo.svg",
+  "assets/options/mustard.svg",
+  "assets/options/no-ice.svg",
+  "assets/options/onion.svg",
+  "assets/options/pickles.svg",
+  "assets/options/relish.svg",
+  "assets/options/sprinkles.svg",
+  "assets/options/strawberry.svg",
+  "assets/options/tomato.svg",
+  "assets/options/vanilla.svg",
   "assets/sounds/add.mp3",
   "assets/sounds/checkout.mp3",
   // Home-screen pictures. The SVG is the drawing. The PNGs are

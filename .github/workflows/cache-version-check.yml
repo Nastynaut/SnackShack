@@ -1,19 +1,33 @@
-# On a pull request, fail if an app file or sw.js changed and
-# CACHE_VERSION did not go up. There is no build and no deploy.
+# Fail if an app file or sw.js changed and CACHE_VERSION did not go up.
+# Runs on pull requests, and on a push to main so a commit made
+# straight on main is checked too. There is no build and no deploy.
 
 name: Cache version
 
 on:
   pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   cache-version:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the pull request
-        uses: actions/checkout@v4
+      - name: Check out the code
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Require a higher CACHE_VERSION when app files change
-        run: node .github/workflows/check-cache-version.mjs "origin/${{ github.base_ref }}" HEAD
+        env:
+          # A pull request compares against the base branch.
+          # A push to main has no base branch, so the script uses BEFORE
+          # (github.event.before). An all-zero BEFORE is a new branch.
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+        run: node .github/workflows/check-cache-version.mjs
