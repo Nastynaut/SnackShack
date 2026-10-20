@@ -18,7 +18,7 @@
 // number. Only install writes a release cache. An open tab keeps
 // its snapshot until a higher number takes over, after the app is
 // closed and opened again.
-var CACHE_VERSION = "1";
+var CACHE_VERSION = "2";
 var CACHE_NAME = "snack-shack-" + CACHE_VERSION;
 
 // This release is gathered here first. The named cache above is
@@ -43,6 +43,7 @@ var APP_FILES = [
   "index.html",
   "app.js",
   "menu.js",
+  "options.js",
   "styles.css",
   "manifest.webmanifest",
   "assets/tokens.css",
@@ -68,8 +69,8 @@ var APP_FILES = [
   "assets/food/pizza-slice.svg",
   "assets/food/soda.svg",
   "assets/food/water.svg",
-  // Option drawings. The options screen does not use them yet.
-  // They are saved now so that screen still works offline later.
+  // Option drawings for the toppings and flavors screen.
+  // options.js asks for these. A missing file falls back to emoji.
   "assets/options/cheese.svg",
   "assets/options/chocolate.svg",
   "assets/options/ice.svg",
@@ -372,9 +373,13 @@ function settleFromCache(request, cached, resolve, reject, realResponse) {
     return;
   }
   if (realResponse) {
-    // Nothing saved. Hand the site's answer back, but do not let the
-    // browser keep it for a later offline load.
-    resolve(request.headers.has("range") ? sliceRange(request, realResponse) : liveCopy(realResponse));
+    // Nothing saved, and this answer failed the "is it our file?"
+    // check. It might be a 404 or a Wi-Fi login page. Hand that real
+    // answer back. Do not slice it into a 206. Safari asks for sounds
+    // in pieces (a Range header). A slice of an error page would look
+    // like a broken sound instead of the real error. Do not let the
+    // browser keep this answer for a later offline load.
+    resolve(liveCopy(realResponse));
     return;
   }
   reject(new Error("offline"));

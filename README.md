@@ -59,11 +59,13 @@ A new `sw.js` takes over only after the tab or window is closed and reopened. A 
 ## How to play
 
 1. Pick a tab: **Food**, **Drinks**, or **Treats**.
-2. Tap a snack. It lands on the ticket on the right.
-3. Use **+** and **−** to change how many. At 0, that snack leaves the ticket.
-4. Tap **Done** to see every item, how many, the line price, and the total.
-5. **Edit Order** goes back to the menu and keeps the ticket.
-6. **New Order** clears the ticket and starts over.
+2. Tap a snack. If it has toppings or a flavor, pick them and tap **Add to Ticket**. **Back** leaves the ticket alone. A snack with no options lands on the ticket in one tap.
+3. The ticket shows the choices in small text under the name. **Plain** means no toppings. Tap that text to change the choices. The button then says **Update**.
+4. The same snack with the same choices adds to that line. Different choices are a separate line.
+5. Use **+** and **−** to change how many. At 0, that line leaves the ticket.
+6. Tap **Done** to see every item, its choices, how many, the line price, and the total.
+7. **Edit Order** goes back to the menu and keeps the ticket.
+8. **New Order** clears the ticket and starts over.
 
 **Sound on / Sound off** sits in the top corner. Adding a snack plays a short ding, and **Done** plays a checkout sound, once those recordings are in the folder. The choice is saved on this device only.
 
@@ -76,6 +78,21 @@ Open `menu.js` in any text editor. Each snack has a `name`, a `price`, an `emoji
 Prices have to be whole dollars: `3`, not `3.50` and not `"3"`. The app multiplies those integers, so the total does not pick up rounding errors.
 
 To move a snack to another tab, cut its `{ ... }` block into that category's `items` list. Milkshake starts under Drinks.
+
+### Toppings and flavors
+
+Snacks that need a choice have an `options` list in `menu.js`. Each group in that list is either:
+
+- `pick: "many"` — toppings. Tap any combination. None selected shows as **Plain** on the ticket.
+- `pick: "one"` — a flavor, or Ice / No ice. The first choice starts selected, so **Add to Ticket** is never stuck.
+
+Each choice has an `id`, a `name`, an `icon` (a file in `assets/options/`), and an `emoji`. If the icon file is missing, the emoji shows. If that is missing too, the name stays. Options are free. They do not change the price.
+
+Burger and Cheeseburger share the `BURGER_TOPPINGS` list. Edit it once and both change. Milkshake and Ice Cream Cone share `SHAKE_FLAVORS`. The hot dog has its own list.
+
+Leave `options` off a snack (Fries, for example) and it still adds in one tap.
+
+A bad choice is skipped. The rest of the menu still loads. The yellow note on the page and the browser console say what was skipped. Ids use letters, numbers, and dashes only.
 
 ## How pictures, sounds, and styles swap in
 
@@ -126,7 +143,8 @@ Fonts stay on the device. `assets/tokens.css` imports `assets/fonts/fonts.css`, 
 
 - `index.html` — the page
 - `styles.css` — colors, sizes, and layout (works on its own)
-- `menu.js` — the snacks and prices
+- `menu.js` — the snacks, prices, toppings, and flavors
+- `options.js` — the toppings and flavors screen
 - `app.js` — what happens when you tap
 - `manifest.webmanifest` — the home-screen name, colors, and icon paths
 - `sw.js` — the offline copy. Swipe the home-screen app closed and open it again to pick up a change.

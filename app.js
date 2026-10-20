@@ -1,16 +1,20 @@
 // ============================================================
 // SNACK SHACK BEHAVIOR
 // ============================================================
-// Two screens share one order:
+// The order moves between screens like this:
 //
+//   Menu  --snack with options-->  Options  --Add or Back-->  Menu
 //   Menu  --Done-->  Summary
 //     ^                  |
 //     |---- Edit Order --|   (order stays)
 //     |---- New Order ---|   (order is cleared)
 //
-// We only remember which snack and how many. The price is always
-// read from menu.js, then multiplied. Prices are whole dollars,
-// so the multiply is exact (no cents, no floating point).
+// A snack with no options skips the options screen.
+//
+// We remember which snack, which options, and how many. The price
+// is always read from menu.js, then multiplied. Options are free.
+// Prices are whole dollars, so the multiply is exact (no cents,
+// no floating point).
 //
 // menu.js has to load first. It creates the global MENU list.
 
@@ -27,17 +31,19 @@
   var itemsById = {};
 
   var state = {
-    // "menu" or "summary"
+    // "menu", "options", or "summary"
     screen: "menu",
     // Which tab is open. A category id from menu.js.
     categoryId: "",
-    // How many of each snack. Example: { burger: 2, soda: 1 }
-    // Zero is not stored. The snack is removed instead.
-    quantities: {},
-    // Ids in the order they were first added, so the ticket
-    // does not jump around when quantities change.
-    addedIds: []
+    // One entry per ticket line, in the order they were added.
+    // The same snack with the same options shares a line.
+    // Different options are a separate line. Zero is not stored.
+    // key is "burger|" (plain) or "burger|ketchup,pickles".
+    lines: []
   };
+
+  // After the ticket is rebuilt, put focus on this + / − / edit button.
+  var ticketFocus = null;
 
   // "ok" once an SVG loads, "missing" if the file is not there.
   // A missing picture is requested only the first time.
@@ -49,6 +55,7 @@
 
   var menuScreen = document.getElementById("menu-screen");
   var summaryScreen = document.getElementById("summary-screen");
+  var optionsScreen = document.getElementById("options-screen");
   var tabsEl = document.getElementById("category-tabs");
   var gridEl = document.getElementById("menu-grid");
   var ticketLinesEl = document.getElementById("ticket-lines");
@@ -276,8 +283,23 @@
           name: itemName,
           price: item.price,
           emoji: typeof item.emoji === "string" ? item.emoji : "",
-          image: typeof item.image === "string" ? item.image : ""
+          image: typeof item.image === "string" ? item.image : "",
+          optionGroups: []
         };
+        // Missing options means one tap adds the snack. A bad list
+        // is skipped with a note. The snack itself still shows.
+        if (item.options !== undefined) {
+          if (window.SnackOptions) {
+            var cleanedOptions = SnackOptions.clean(item.options, itemName);
+            var optionNote;
+            for (optionNote = 0; optionNote < cleanedOptions.problems.length; optionNote++) {
+              problems.push(cleanedOptions.problems[optionNote]);
+            }
+            snack.optionGroups = cleanedOptions.groups;
+          } else {
+            problems.push(itemName + "'s options could not be read. The options screen is missing.");
+          }
+        }
         var priceNote = priceProblem(snack);
         if (priceNote) {
           problems.push(priceNote);
@@ -440,29 +462,74 @@
     return item.price * quantity;
   }
 
-  function eachAddedId(callback) {
-    for (var i = 0; i < state.addedIds.length; i++) {
-      var id = state.addedIds[i];
-      var item = itemsById[id];
-      var quantity = state.quantities[id];
-      if (item && quantity) {
-        callback(item, quantity);
+  function eachLine(callback) {
+    for (var i = 0; i < state.lines.length; i++) {
+      var line = state.lines[i];
+      var item = itemsById[line.itemId];
+      if (item && line.quantity) {
+        callback(item, line);
       }
     }
   }
 
+  function findLine(key) {
+    var i;
+    for (i = 0; i < state.lines.length; i++) {
+      if (state.lines[i].key === key) {
+        return state.lines[i];
+      }
+    }
+    return null;
+  }
+
+  function removeLine(key) {
+    var kept = [];
+    var i;
+    for (i = 0; i < state.lines.length; i++) {
+      if (state.lines[i].key !== key) {
+        kept.push(state.lines[i]);
+      }
+    }
+    state.lines = kept;
+  }
+
+  // How many of this snack are on the ticket, across every options line.
+  function quantityOf(itemId) {
+    var total = 0;
+    var i;
+    for (i = 0; i < state.lines.length; i++) {
+      if (state.lines[i].itemId === itemId) {
+        total += state.lines[i].quantity;
+      }
+    }
+    return total;
+  }
+
+  // "Burger, Ketchup, Pickles" for the screen reader. Snacks with no
+  // options are just the name, so the announcement stays the same.
+  function lineLabel(item, optionIds) {
+    if (!window.SnackOptions || !SnackOptions.hasOptions(item)) {
+      return item.name;
+    }
+    var details = SnackOptions.detailsText(item.optionGroups, optionIds);
+    if (!details) {
+      return item.name;
+    }
+    return item.name + ", " + details;
+  }
+
   function orderTotal() {
     var total = 0;
-    eachAddedId(function (item, quantity) {
-      total += lineTotal(item, quantity);
+    eachLine(function (item, line) {
+      total += lineTotal(item, line.quantity);
     });
     return total;
   }
 
   function totalQuantity() {
     var count = 0;
-    eachAddedId(function (item, quantity) {
-      count += quantity;
+    eachLine(function (item, line) {
+      count += line.quantity;
     });
     return count;
   }
@@ -597,13 +664,59 @@
   // Changing the order
   // ----------------------------------------------------------
 
-  function changeQuantity(id, delta) {
-    var item = itemsById[id];
+  // Add one of this snack with these options. Same options join the
+  // line that is already there. Different options start a new line.
+  function addLine(item, optionIds) {
+    var ids = optionIds || [];
+    if (window.SnackOptions) {
+      ids = SnackOptions.normalize(item.optionGroups || [], ids);
+    }
+    var key = window.SnackOptions ? SnackOptions.lineKey(item.id, ids) : item.id + "|";
+    var line = findLine(key);
+    var isNew = !line;
+    if (line && line.quantity >= MAX_QUANTITY) {
+      say(item.name + " is already at " + MAX_QUANTITY + ".");
+      return;
+    }
+    if (!line) {
+      line = {
+        key: key,
+        itemId: item.id,
+        optionIds: ids.slice(),
+        quantity: 0
+      };
+      state.lines.push(line);
+    }
+    line.quantity += 1;
+    // Ding only when the count goes up. A missing mp3 stays quiet.
+    playAdd();
+    say(
+      lineLabel(item, line.optionIds) +
+        ", " +
+        line.quantity +
+        ". Total " +
+        formatDollars(orderTotal()) +
+        "."
+    );
+    renderOrder();
+    if (isNew) {
+      revealTicketRow(key);
+      updateScrollHint();
+    }
+  }
+
+  // + and − on one ticket line. The options stay the same.
+  function changeLine(key, delta) {
+    var line = findLine(key);
+    if (!line) {
+      return;
+    }
+    var item = itemsById[line.itemId];
     if (!item) {
       return;
     }
 
-    var current = state.quantities[id] || 0;
+    var current = line.quantity;
     var next = current + delta;
     if (next > MAX_QUANTITY) {
       next = MAX_QUANTITY;
@@ -617,28 +730,14 @@
     }
 
     var addedOne = next > current;
-    // A brand-new line should scroll into view. + on a snack
-    // that is already on the ticket leaves the scroll alone.
-    var isNewLine = addedOne && !state.quantities[id];
 
     if (next === 0) {
-      delete state.quantities[id];
-      var kept = [];
-      for (var i = 0; i < state.addedIds.length; i++) {
-        if (state.addedIds[i] !== id) {
-          kept.push(state.addedIds[i]);
-        }
-      }
-      state.addedIds = kept;
-      say("Removed " + item.name + ". Total " + formatDollars(orderTotal()) + ".");
+      removeLine(key);
+      say("Removed " + lineLabel(item, line.optionIds) + ". Total " + formatDollars(orderTotal()) + ".");
     } else {
-      // First time this snack is on the ticket: remember its place.
-      if (!state.quantities[id]) {
-        state.addedIds.push(id);
-      }
-      state.quantities[id] = next;
+      line.quantity = next;
       say(
-        item.name +
+        lineLabel(item, line.optionIds) +
           ", " +
           next +
           ". Total " +
@@ -647,26 +746,50 @@
       );
     }
 
-    // Ding only when the count goes up (a tap on the menu or +).
-    // Minus stays quiet. A missing mp3 stays quiet too.
+    // Ding only when the count goes up. Minus stays quiet.
     if (addedOne) {
       playAdd();
     }
 
     renderOrder();
-    if (isNewLine) {
-      revealTicketRow(id);
-      updateScrollHint();
+  }
+
+  // Change the options on a line that is already on the ticket.
+  // If another line already has those options, the quantities merge.
+  function rewriteLine(oldKey, item, optionIds) {
+    var line = findLine(oldKey);
+    if (!line) {
+      return oldKey;
     }
+    var ids = SnackOptions.normalize(item.optionGroups, optionIds);
+    var newKey = SnackOptions.lineKey(item.id, ids);
+    if (newKey === oldKey) {
+      return oldKey;
+    }
+    var other = findLine(newKey);
+    if (other && other !== line) {
+      var merged = other.quantity + line.quantity;
+      if (merged > MAX_QUANTITY) {
+        merged = MAX_QUANTITY;
+      }
+      other.quantity = merged;
+      removeLine(oldKey);
+    } else {
+      line.key = newKey;
+      line.optionIds = ids.slice();
+    }
+    say("Updated " + lineLabel(item, ids) + ". Total " + formatDollars(orderTotal()) + ".");
+    renderOrder();
+    return newKey;
   }
 
   // Bring a new ticket row on screen, but only if it is cut off.
   // block: "nearest" does not jump when the row is already visible.
-  function revealTicketRow(id) {
+  function revealTicketRow(key) {
     var rows = ticketLinesEl.querySelectorAll(".ticket-row");
     var i;
     for (i = 0; i < rows.length; i++) {
-      if (rows[i].getAttribute("data-id") === id) {
+      if (rows[i].getAttribute("data-line") === key) {
         rows[i].scrollIntoView({ block: "nearest" });
         return;
       }
@@ -674,8 +797,7 @@
   }
 
   function clearOrder() {
-    state.quantities = {};
-    state.addedIds = [];
+    state.lines = [];
     state.screen = "menu";
     state.categoryId = firstOpenCategoryId() || MENU.categories[0].id;
     say("New order. The ticket is empty.");
@@ -692,7 +814,10 @@
   function showScreen(moveFocus) {
     var onMenu = state.screen === "menu";
     menuScreen.hidden = !onMenu;
-    summaryScreen.hidden = onMenu;
+    summaryScreen.hidden = state.screen !== "summary";
+    if (optionsScreen) {
+      optionsScreen.hidden = state.screen !== "options";
+    }
 
     if (!moveFocus) {
       return;
@@ -710,7 +835,7 @@
           firstTab.focus({ preventScroll: true });
         }
       }
-    } else {
+    } else if (state.screen === "summary") {
       document.getElementById("summary-heading").focus({ preventScroll: true });
     }
 
@@ -885,9 +1010,14 @@
     button.appendChild(price);
     button.appendChild(badge);
 
-    // Tapping the picture, the name, or the price all add one.
+    // Toppings and flavors open the options screen. Everything else
+    // still adds in one tap.
     button.addEventListener("click", function () {
-      changeQuantity(item.id, 1);
+      if (window.SnackOptions && SnackOptions.hasOptions(item)) {
+        openPicker(item, SnackOptions.defaults(item.optionGroups), "add", "");
+        return;
+      }
+      addLine(item, []);
     });
 
     return button;
@@ -918,8 +1048,13 @@
       var button = buttons[i];
       var id = button.getAttribute("data-id");
       var item = itemsById[id];
-      var quantity = state.quantities[id] || 0;
+      var quantity = quantityOf(id);
       var badge = button.querySelector(".badge");
+      var chooses = window.SnackOptions && SnackOptions.hasOptions(item);
+      var action = chooses ? "Tap to choose options." : "Tap to add.";
+      if (quantity > 0 && !chooses) {
+        action = "Tap to add another.";
+      }
 
       button.classList.toggle("is-on-ticket", quantity > 0);
       if (quantity > 0) {
@@ -927,13 +1062,13 @@
         badge.textContent = String(quantity);
         button.setAttribute(
           "aria-label",
-          item.name + ", " + formatDollars(item.price) + ", " + quantity + " on the ticket. Tap to add another."
+          item.name + ", " + formatDollars(item.price) + ", " + quantity + " on the ticket. " + action
         );
       } else {
         badge.hidden = true;
         button.setAttribute(
           "aria-label",
-          item.name + ", " + formatDollars(item.price) + ". Tap to add."
+          item.name + ", " + formatDollars(item.price) + ". " + action
         );
       }
     }
@@ -945,9 +1080,11 @@
     var active = document.activeElement;
     var restoreId = "";
     var restoreAction = "";
+    var restoreLine = "";
     if (active && ticketLinesEl.contains(active)) {
       restoreId = active.getAttribute("data-id") || "";
       restoreAction = active.getAttribute("data-action") || "";
+      restoreLine = active.getAttribute("data-line") || "";
     }
 
     // Rebuilding used to jump back to the top. Keep the place
@@ -956,28 +1093,32 @@
 
     ticketLinesEl.innerHTML = "";
 
-    if (state.addedIds.length === 0) {
+    if (state.lines.length === 0) {
       var empty = document.createElement("p");
       empty.className = "ticket-empty";
       empty.textContent = "Tap a snack to start the ticket.";
       ticketLinesEl.appendChild(empty);
     } else {
-      eachAddedId(function (item, quantity) {
-        ticketLinesEl.appendChild(makeTicketRow(item, quantity));
+      eachLine(function (item, line) {
+        ticketLinesEl.appendChild(makeTicketRow(item, line));
       });
     }
 
     var total = orderTotal();
     ticketTotalEl.textContent = formatDollars(total);
     // Done stays quiet until there is something to summarize.
-    doneButton.disabled = state.addedIds.length === 0;
+    doneButton.disabled = state.lines.length === 0;
 
     if (savedScroll > 0) {
       ticketLinesEl.scrollTop = savedScroll;
     }
 
-    if (restoreId && restoreAction) {
-      restoreTicketFocus(restoreId, restoreAction);
+    if (ticketFocus) {
+      var wanted = ticketFocus;
+      ticketFocus = null;
+      restoreTicketFocus(wanted.id, wanted.action, wanted.line);
+    } else if (restoreId && restoreAction) {
+      restoreTicketFocus(restoreId, restoreAction, restoreLine);
     }
 
     refitTicket();
@@ -987,24 +1128,31 @@
   // A disabled + cannot hold focus, and neither can a deleted row.
   // Match the button by its data, not by pasting the id into a selector.
   // An id with a quote used to throw and blank the page.
-  function findTicketButton(id, action) {
+  function findTicketButton(id, action, lineKey) {
     var buttons = ticketLinesEl.querySelectorAll("button");
     var i;
     for (i = 0; i < buttons.length; i++) {
       var button = buttons[i];
-      if (button.getAttribute("data-id") === id && button.getAttribute("data-action") === action) {
-        return button;
+      if (id && button.getAttribute("data-id") !== id) {
+        continue;
       }
+      if (button.getAttribute("data-action") !== action) {
+        continue;
+      }
+      if (lineKey && button.getAttribute("data-line") !== lineKey) {
+        continue;
+      }
+      return button;
     }
     return null;
   }
 
-  function restoreTicketFocus(id, action) {
-    var button = findTicketButton(id, action);
+  function restoreTicketFocus(id, action, lineKey) {
+    var button = findTicketButton(id, action, lineKey);
 
     // + just hit 99 and is now disabled. Land on that row's −.
     if (button && button.disabled) {
-      button = findTicketButton(id, "minus");
+      button = findTicketButton(id, "minus", lineKey);
     }
 
     // The row is gone (quantity hit 0). Move to a button that is left.
@@ -1100,29 +1248,48 @@
     );
   }
 
-  function makeTicketRow(item, quantity) {
+  function makeTicketRow(item, line) {
     var row = document.createElement("div");
     row.className = "ticket-row";
     row.setAttribute("data-id", item.id);
+    row.setAttribute("data-line", line.key);
 
-    // Name, with the each-price tucked under it when the row has room.
-    var main = document.createElement("div");
+    var hasChoices = window.SnackOptions && SnackOptions.hasOptions(item);
+    var details = hasChoices ? SnackOptions.detailsText(item.optionGroups, line.optionIds) : "";
+
+    // Name, the choices, and the each-price. Snacks with options
+    // use a button so a tap here can change that line.
+    var main = document.createElement(hasChoices ? "button" : "div");
     main.className = "line-main";
+    if (hasChoices) {
+      main.type = "button";
+      main.classList.add("line-details");
+      main.setAttribute("data-action", "edit");
+      main.setAttribute("data-id", item.id);
+      main.setAttribute("data-line", line.key);
+      main.setAttribute("aria-label", item.name + ", " + details + ". Tap to change.");
+    }
 
     var name = document.createElement("span");
     name.className = "line-name";
     name.textContent = item.name;
+    main.appendChild(name);
+
+    if (details) {
+      var optionsText = document.createElement("span");
+      optionsText.className = "line-options";
+      optionsText.textContent = details;
+      main.appendChild(optionsText);
+    }
 
     var each = document.createElement("span");
     each.className = "line-each";
     each.textContent = formatDollars(item.price) + " each";
-
-    main.appendChild(name);
     main.appendChild(each);
 
     var linePrice = document.createElement("span");
     linePrice.className = "line-price";
-    linePrice.textContent = formatDollars(lineTotal(item, quantity));
+    linePrice.textContent = formatDollars(lineTotal(item, line.quantity));
 
     var qty = document.createElement("div");
     qty.className = "qty";
@@ -1132,21 +1299,23 @@
     minus.className = "qty-button qty-minus btn btn--icon btn--remove";
     minus.setAttribute("data-action", "minus");
     minus.setAttribute("data-id", item.id);
-    minus.setAttribute("aria-label", "Remove one " + item.name);
+    minus.setAttribute("data-line", line.key);
+    minus.setAttribute("aria-label", "Remove one " + lineLabel(item, line.optionIds));
     minus.textContent = "\u2212";
 
     var number = document.createElement("span");
     number.className = "qty-number";
-    number.textContent = String(quantity);
+    number.textContent = String(line.quantity);
 
     var plus = document.createElement("button");
     plus.type = "button";
     plus.className = "qty-button qty-plus btn btn--icon btn--add";
     plus.setAttribute("data-action", "plus");
     plus.setAttribute("data-id", item.id);
-    plus.setAttribute("aria-label", "Add one " + item.name);
+    plus.setAttribute("data-line", line.key);
+    plus.setAttribute("aria-label", "Add one " + lineLabel(item, line.optionIds));
     plus.textContent = "+";
-    plus.disabled = quantity >= MAX_QUANTITY;
+    plus.disabled = line.quantity >= MAX_QUANTITY;
 
     qty.appendChild(minus);
     qty.appendChild(number);
@@ -1161,19 +1330,31 @@
   function renderSummary() {
     summaryLinesEl.innerHTML = "";
 
-    eachAddedId(function (item, quantity) {
+    eachLine(function (item, line) {
       var row = document.createElement("div");
       row.className = "summary-row";
 
       var name = document.createElement("span");
-      name.textContent = item.name;
+      name.className = "summary-item";
+
+      var nameText = document.createElement("span");
+      nameText.className = "summary-name";
+      nameText.textContent = item.name;
+      name.appendChild(nameText);
+
+      if (window.SnackOptions && SnackOptions.hasOptions(item)) {
+        var optionsText = document.createElement("span");
+        optionsText.className = "summary-options";
+        optionsText.textContent = SnackOptions.detailsText(item.optionGroups, line.optionIds);
+        name.appendChild(optionsText);
+      }
 
       var howMany = document.createElement("span");
-      howMany.textContent = String(quantity);
+      howMany.textContent = String(line.quantity);
 
       var price = document.createElement("span");
       price.className = "summary-price";
-      price.textContent = formatDollars(lineTotal(item, quantity));
+      price.textContent = formatDollars(lineTotal(item, line.quantity));
 
       row.appendChild(name);
       row.appendChild(howMany);
@@ -1193,6 +1374,78 @@
     updateBadges();
     renderTicket();
     renderSummary();
+  }
+
+  // ----------------------------------------------------------
+  // Options screen
+  // ----------------------------------------------------------
+  // The screen itself lives in options.js. These functions only
+  // open it, then put the result on the ticket and send focus back.
+
+  function focusMenuItem(itemId) {
+    var buttons = gridEl.querySelectorAll(".menu-item");
+    var i;
+    for (i = 0; i < buttons.length; i++) {
+      if (buttons[i].getAttribute("data-id") === itemId) {
+        buttons[i].focus({ preventScroll: true });
+        return;
+      }
+    }
+    focusSelectedTab();
+  }
+
+  function finishPicker(item, mode, fromKey, confirmed, ids) {
+    // Show the menu before the ticket redraws, so a new row can
+    // scroll into view. Back stays on the same tab and adds nothing.
+    state.screen = "menu";
+    showScreen(false);
+    var focusKey = fromKey;
+    if (confirmed && mode === "edit") {
+      focusKey = rewriteLine(fromKey, item, ids);
+    } else if (confirmed) {
+      addLine(item, ids);
+    }
+    if (mode === "edit") {
+      var button = findTicketButton(item.id, "edit", focusKey);
+      if (button) {
+        button.focus({ preventScroll: true });
+      }
+    } else {
+      focusMenuItem(item.id);
+    }
+    refitTicket();
+  }
+
+  function openPicker(item, selectedIds, mode, fromKey) {
+    SnackOptions.render({
+      item: item,
+      selectedIds: selectedIds,
+      confirmLabel: mode === "edit" ? "Update" : "Add to Ticket",
+      onConfirm: function (ids) {
+        finishPicker(item, mode, fromKey, true, ids);
+      },
+      onCancel: function () {
+        finishPicker(item, mode, fromKey, false, null);
+      }
+    });
+    state.screen = "options";
+    showScreen(false);
+    var title = document.getElementById("options-title");
+    if (title) {
+      title.focus({ preventScroll: true });
+    }
+  }
+
+  function openPickerForLine(key) {
+    var line = findLine(key);
+    if (!line) {
+      return;
+    }
+    var item = itemsById[line.itemId];
+    if (!item || !window.SnackOptions || !SnackOptions.hasOptions(item)) {
+      return;
+    }
+    openPicker(item, line.optionIds.slice(), "edit", key);
   }
 
   // ----------------------------------------------------------
@@ -1224,17 +1477,19 @@
       if (!button || !ticketLinesEl.contains(button)) {
         return;
       }
-      var id = button.getAttribute("data-id");
+      var key = button.getAttribute("data-line");
       var action = button.getAttribute("data-action");
       if (action === "plus") {
-        changeQuantity(id, 1);
+        changeLine(key, 1);
       } else if (action === "minus") {
-        changeQuantity(id, -1);
+        changeLine(key, -1);
+      } else if (action === "edit") {
+        openPickerForLine(key);
       }
     });
 
     doneButton.addEventListener("click", function () {
-      if (state.addedIds.length === 0) {
+      if (state.lines.length === 0) {
         return;
       }
       state.screen = "summary";
