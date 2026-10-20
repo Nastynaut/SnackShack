@@ -17,6 +17,26 @@ var CACHE_VERSION = "snack-shack-1";
 // How long we wait for the site before using the saved copy.
 var NETWORK_WAIT_MS = 3000;
 
+// After the page itself had to use the saved copy, keep using that
+// copy for its pictures, scripts, and sounds. This lasts a short
+// while so a slow Wi-Fi does not add another 3 second wait for
+// every file. A real answer from the site clears it.
+var offlineUntil = 0;
+var OFFLINE_HOLD_MS = 30000;
+
+// The type each kind of file should have. A hotel or school login
+// page is HTML for every address, so a mismatch means "not our file".
+var TYPE_BY_EXT = {
+  ".html": ["text/html"],
+  ".js": ["javascript"],
+  ".css": ["text/css"],
+  ".svg": ["image/svg+xml"],
+  ".png": ["image/png"],
+  ".woff2": ["font/woff2", "application/font-woff2", "application/octet-stream"],
+  ".mp3": ["audio/mpeg"],
+  ".webmanifest": ["application/manifest+json", "application/json"]
+};
+
 // Only files the page needs while it runs. cache.addAll stops the
 // whole save if any ONE of these is missing, so notes and license
 // text stay out of this list.
@@ -99,12 +119,53 @@ function sliceRange(request, cached) {
   });
 }
 
+// The end of the file name, like ".css". The home page has none.
+function fileExtension(request) {
+  var path = new URL(request.url).pathname;
+  var slash = path.lastIndexOf("/");
+  var name = slash === -1 ? path : path.slice(slash + 1);
+  var dot = name.lastIndexOf(".");
+  if (dot <= 0) {
+    return "";
+  }
+  return name.slice(dot).toLowerCase();
+}
+
+function typeMatches(contentType, names) {
+  for (var i = 0; i < names.length; i++) {
+    if (contentType.indexOf(names[i]) !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// A Wi-Fi login page must never be saved over the app. Redirects,
+// errors, and the wrong kind of file all count as a miss.
+function isOurFile(request, response) {
+  if (!response || !response.ok || response.redirected) {
+    return false;
+  }
+  var contentType = (response.headers.get("content-type") || "").toLowerCase();
+  var ext = fileExtension(request);
+  var names = TYPE_BY_EXT[ext];
+  // The home page has no extension. It must be HTML, same as a click
+  // that loads the page.
+  if (isPageLoad(request) || ext === ".html" || ext === "") {
+    names = ["text/html"];
+  }
+  if (!names) {
+    return contentType.indexOf("text/html") === -1;
+  }
+  return typeMatches(contentType, names);
+}
+
 // Save one file, skipping the browser's old copy so install stores
-// what the site has right now.
+// what the site has right now. A login page fails this and is not saved.
 function saveOne(cache, path) {
   var request = new Request(path, { cache: "reload" });
   return fetch(request).then(function (response) {
-    if (!response || response.status !== 200) {
+    if (!isOurFile(request, response)) {
       throw new Error(path);
     }
     return cache.put(request, response);
@@ -181,9 +242,35 @@ function pageKey(request) {
   return url.toString();
 }
 
-// Ask the site first. If it answers, keep that copy. If it is quiet
-// for about 3 seconds, or it cannot be reached, use the saved copy.
+function noteSavedPage() {
+  offlineUntil = Date.now() + OFFLINE_HOLD_MS;
+}
+
+function noteLiveFile() {
+  offlineUntil = 0;
+}
+
+// The page already fell back. Its other files skip the network wait.
+function savedCopyIsEnough(request) {
+  return !isPageLoad(request) && Date.now() < offlineUntil;
+}
+
+// Use the saved copy, and remember that the page itself had to.
+function useSavedCopy(request) {
+  if (isPageLoad(request)) {
+    noteSavedPage();
+  }
+  return fromCache(request);
+}
+
+// Ask the site first. If it answers with our real file, keep that
+// copy. If it is quiet for about 3 seconds, sends a login page, or
+// cannot be reached, use the saved copy and do not store the bad one.
 function networkFirst(request) {
+  if (savedCopyIsEnough(request)) {
+    return fromCache(request);
+  }
+
   return new Promise(function (resolve) {
     var finished = false;
     var timer = setTimeout(function () {
@@ -191,31 +278,28 @@ function networkFirst(request) {
         return;
       }
       finished = true;
-      resolve(fromCache(request));
+      resolve(useSavedCopy(request));
     }, NETWORK_WAIT_MS);
 
     fetch(freshRequest(request)).then(function (response) {
+      // Throw so the catch below serves the saved copy. A login
+      // page, a redirect, or the wrong type must not be stored.
+      if (!isOurFile(request, response)) {
+        throw new Error("not our file");
+      }
+      noteLiveFile();
       // The wait already ended, so the page has the saved copy.
-      // Still keep this answer for the next visit.
+      // Still keep this real answer for the next visit.
       if (finished) {
-        if (response && response.status === 200) {
-          remember(request, response.clone());
-        }
+        remember(request, response.clone());
         return;
       }
       finished = true;
       clearTimeout(timer);
 
       // Copy first. Slicing a sound uses up the original body.
-      var saved = response && response.status === 200 ? response.clone() : null;
-      var send = response;
-      if (saved && request.headers.has("range")) {
-        send = sliceRange(request, response);
-      }
-      if (!saved) {
-        resolve(send);
-        return;
-      }
+      var saved = response.clone();
+      var send = request.headers.has("range") ? sliceRange(request, response) : response;
       // Finish saving before we hand the file back, so a later read
       // sees this copy and not the older one.
       remember(request, saved).then(function () {
@@ -229,7 +313,7 @@ function networkFirst(request) {
       }
       finished = true;
       clearTimeout(timer);
-      resolve(fromCache(request));
+      resolve(useSavedCopy(request));
     });
   });
 }

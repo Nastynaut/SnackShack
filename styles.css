@@ -48,7 +48,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* The page itself does not bounce. The menu and the ticket still scroll. */
   overscroll-behavior: none;
-  /* Reduces accidental double-tap zoom. Pinch zoom stays possible. */
+  /* Limits accidental double-tap zoom. Pinch zoom is blocked in app.js. */
   touch-action: manipulation;
 }
 
@@ -75,7 +75,7 @@ button {
   font: inherit;
   color: var(--ink);
   cursor: pointer;
-  /* Same trade-off as the page: fewer accidental zooms, pinch still works. */
+  /* Limits accidental double-tap zoom on a button. */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }

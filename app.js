@@ -543,9 +543,8 @@
   var playAdd = makeSound("assets/sounds/add.mp3");
   var playCheckout = makeSound("assets/sounds/checkout.mp3");
 
-  // Accessibility zoom stays possible. touch-action: manipulation
-  // in styles.css, plus this handler, reduces accidental double-tap
-  // zoom while a child is tapping snacks.
+  // Blocks pinch zoom on iOS. Kids pinch by accident while they tap
+  // snacks, and the home-screen request asked us to keep the page still.
   document.addEventListener("gesturestart", function (event) {
     event.preventDefault();
   });

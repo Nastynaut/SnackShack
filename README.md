@@ -21,7 +21,7 @@ It is laid out for a tablet held sideways (landscape), around 1024Ã—768 or 1280Ã
 5. The name is **Snack Shack**. Tap **Add**.
 6. Open **Snack Shack** from the home screen **once while the iPad is online**.
 
-After that one online open, turn on airplane mode. The app still opens full screen, held sideways, and the whole order works. Adding a snack and tapping **Done** still play their sounds. The home-screen picture is the Snack Shack icon already in this project.
+After that one online open, turn on airplane mode. The app still opens full screen, and the whole order works. It stays held sideways when Rotation Lock is on. Adding a snack and tapping **Done** still play their sounds. The home-screen picture is the Snack Shack icon already in this project.
 
 ### Your own copy (optional)
 
@@ -55,6 +55,8 @@ python3 -m http.server 8000
 ```
 
 Open `http://localhost:8000` in the browser. Stop the server with Ctrl+C when you are done.
+
+A new `sw.js` takes over only after the tab or window is closed and reopened. A reload keeps the copy that is already running.
 
 ## How to play
 
