@@ -43,6 +43,10 @@
   // A missing picture is requested only the first time.
   var pictureStatus = {};
 
+  // Lines already sitting in the yellow note. A picture that fails
+  // later is added to this same list.
+  var menuProblems = [];
+
   var menuScreen = document.getElementById("menu-screen");
   var summaryScreen = document.getElementById("summary-screen");
   var tabsEl = document.getElementById("category-tabs");
@@ -405,6 +409,18 @@
     note.hidden = false;
   }
 
+  // Add one sentence to the yellow note. Repeating the same sentence
+  // (the picture can error once per visit) does not stack copies.
+  function addMenuProblem(text) {
+    if (menuProblems.indexOf(text) !== -1) {
+      return;
+    }
+    menuProblems.push(text);
+    console.warn(text);
+    showMenuNotes(menuProblems);
+    refitTicket();
+  }
+
   function findCategory(id) {
     for (var i = 0; i < MENU.categories.length; i++) {
       if (MENU.categories[i].id === id) {
@@ -474,7 +490,7 @@
     soundMuted = false;
   }
 
-  // Returns a play() function for one file.
+  // Returns play() and prime() for one sound file.
   function makeSound(src) {
     var audio = new Audio();
     var available = true;
@@ -487,7 +503,7 @@
     // Set src after the listener so a fast error is not missed.
     audio.src = src;
 
-    return function play() {
+    function play() {
       if (soundMuted || !available) {
         return;
       }
@@ -500,6 +516,7 @@
       if (!isFinite(volume) || volume < 0 || volume > 1) {
         volume = 0.6;
       }
+      audio.muted = false;
       audio.volume = volume;
 
       try {
@@ -517,11 +534,93 @@
           }
         });
       }
-    };
+    }
+
+    // iPad Safari will not play a file later unless it was started
+    // inside a tap. Play it with the speaker off, then stop. If the
+    // file is missing, or the browser says no, stay quiet.
+    function prime() {
+      if (!available) {
+        return;
+      }
+      audio.muted = true;
+      var pending;
+      try {
+        pending = audio.play();
+      } catch (err) {
+        audio.muted = false;
+        return;
+      }
+      if (!pending || !pending.then) {
+        try {
+          audio.pause();
+        } catch (err) {
+          // Already stopped.
+        }
+        audio.muted = false;
+        return;
+      }
+      pending.then(function () {
+        // A real ding may have turned the speaker back on. Leave it.
+        if (!audio.muted) {
+          return;
+        }
+        audio.pause();
+        try {
+          audio.currentTime = 0;
+        } catch (err) {
+          // Not loaded enough to rewind. The next play starts at 0.
+        }
+        audio.muted = false;
+      }).catch(function () {
+        audio.muted = false;
+      });
+    }
+
+    return { play: play, prime: prime };
   }
 
-  var playAdd = makeSound("assets/sounds/add.mp3");
-  var playCheckout = makeSound("assets/sounds/checkout.mp3");
+  var addSound = makeSound("assets/sounds/add.mp3");
+  var checkoutSound = makeSound("assets/sounds/checkout.mp3");
+  var playAdd = addSound.play;
+  var playCheckout = checkoutSound.play;
+
+  // The first finger or mouse press unlocks both sounds for the visit.
+  var soundsReady = false;
+  function unlockSounds() {
+    if (soundsReady) {
+      return;
+    }
+    soundsReady = true;
+    addSound.prime();
+    checkoutSound.prime();
+  }
+
+  // pointerdown covers a mouse and a modern iPad finger.
+  // touchend covers older iPad Safari, which may skip pointer events.
+  document.addEventListener("pointerdown", unlockSounds, true);
+  document.addEventListener("touchend", unlockSounds, true);
+
+  // The viewport tag is not enough on iPad. A pinch still sends
+  // gesturestart. Stop it so the register cannot be zoomed.
+  document.addEventListener("gesturestart", function (event) {
+    event.preventDefault();
+  });
+
+  // Save the page for airplane mode. file:// (a double-clicked
+  // index.html) cannot do this, and that is fine for a quick look.
+  function registerOfflineCopy() {
+    var protocol = window.location.protocol;
+    if (protocol !== "http:" && protocol !== "https:") {
+      return;
+    }
+    if (!navigator.serviceWorker) {
+      return;
+    }
+    navigator.serviceWorker.register("./sw.js").catch(function () {
+      // Saving failed. This visit still works online.
+    });
+  }
 
   function rememberMute() {
     try {
@@ -810,6 +909,11 @@
         pictureStatus[item.id] = "missing";
         img.hidden = true;
         emoji.hidden = false;
+        // The emoji stands in when a drawing is missing. With no emoji
+        // either, tell a grown-up in the same yellow note.
+        if (!textOf(item.emoji)) {
+          addMenuProblem(item.name + "'s picture didn't load.");
+        }
       });
       // Set src after the listeners, or a fast error can be missed.
       img.src = item.image;
@@ -1149,14 +1253,18 @@
   // ----------------------------------------------------------
 
   function init() {
+    // Do this even if the menu is broken, so the page can reopen offline.
+    registerOfflineCopy();
+
     var prepared = prepareMenu();
     // Swap in the cleaned copy. menu.js itself is not rewritten.
     window.MENU = { categories: prepared.categories };
+    menuProblems = prepared.problems.slice();
 
     if (prepared.failed) {
       // One sentence, in the yellow note. A second copy used to
       // sit at the top of the page as well.
-      showMenuNotes(prepared.problems);
+      showMenuNotes(menuProblems);
       return;
     }
 
@@ -1222,7 +1330,7 @@
     }
 
     // Yellow note when a price or id was skipped. Hidden when the menu is fine.
-    showMenuNotes(prepared.problems);
+    showMenuNotes(menuProblems);
 
     renderTabs();
     renderMenuGrid();
