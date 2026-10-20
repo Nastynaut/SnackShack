@@ -40,13 +40,11 @@ Use that address the same way as the steps above.
 
 ### After you change a file
 
-The iPad keeps the saved copy until you tell it the copy is new.
+The home-screen app keeps the copy it already opened. To get an update, swipe the Snack Shack app closed, then open it again.
 
-1. Open `sw.js`.
-2. Find `CACHE_VERSION`. The comment says **bump this when you change any file**.
-3. Change the text in quotes, for example from `snack-shack-1` to `snack-shack-2`.
-4. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file. Keep the path relative, with no slash at the start.
-5. Save, update the files on the web, then open the home-screen app once while online.
+To lock orientation, use iPad Rotation Lock in Control Center.
+
+`CACHE_VERSION` in `sw.js` is only a switch that wipes the saved copy. You do not need to change it for an ordinary edit. Change the name (for example from `snack-shack-1` to `snack-shack-2`) only when that saved copy is wrong and the iPad should forget it. If you added a new file the page needs, add its path to the `APP_FILES` list in that same file. Keep the path relative, with no slash at the start.
 
 ### Try it on your computer
 
@@ -131,4 +129,4 @@ Fonts stay on the device. `assets/tokens.css` imports `assets/fonts/fonts.css`, 
 - `menu.js` — the snacks and prices
 - `app.js` — what happens when you tap
 - `manifest.webmanifest` — the home-screen name, colors, and icon paths
-- `sw.js` — the offline copy. Bump `CACHE_VERSION` after you change a file.
+- `sw.js` — the offline copy. Swipe the home-screen app closed and open it again to pick up a change.

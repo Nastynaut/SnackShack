@@ -490,7 +490,9 @@
     soundMuted = false;
   }
 
-  // Returns play() and prime() for one sound file.
+  // Returns a play() function for one file.
+  // The ding plays inside the tap that added the snack, so iPad
+  // Safari allows it. No extra first-tap priming.
   function makeSound(src) {
     var audio = new Audio();
     var available = true;
@@ -516,7 +518,6 @@
       if (!isFinite(volume) || volume < 0 || volume > 1) {
         volume = 0.6;
       }
-      audio.muted = false;
       audio.volume = volume;
 
       try {
@@ -536,73 +537,15 @@
       }
     }
 
-    // iPad Safari will not play a file later unless it was started
-    // inside a tap. Play it with the speaker off, then stop. If the
-    // file is missing, or the browser says no, stay quiet.
-    function prime() {
-      if (!available) {
-        return;
-      }
-      audio.muted = true;
-      var pending;
-      try {
-        pending = audio.play();
-      } catch (err) {
-        audio.muted = false;
-        return;
-      }
-      if (!pending || !pending.then) {
-        try {
-          audio.pause();
-        } catch (err) {
-          // Already stopped.
-        }
-        audio.muted = false;
-        return;
-      }
-      pending.then(function () {
-        // A real ding may have turned the speaker back on. Leave it.
-        if (!audio.muted) {
-          return;
-        }
-        audio.pause();
-        try {
-          audio.currentTime = 0;
-        } catch (err) {
-          // Not loaded enough to rewind. The next play starts at 0.
-        }
-        audio.muted = false;
-      }).catch(function () {
-        audio.muted = false;
-      });
-    }
-
-    return { play: play, prime: prime };
+    return play;
   }
 
-  var addSound = makeSound("assets/sounds/add.mp3");
-  var checkoutSound = makeSound("assets/sounds/checkout.mp3");
-  var playAdd = addSound.play;
-  var playCheckout = checkoutSound.play;
+  var playAdd = makeSound("assets/sounds/add.mp3");
+  var playCheckout = makeSound("assets/sounds/checkout.mp3");
 
-  // The first finger or mouse press unlocks both sounds for the visit.
-  var soundsReady = false;
-  function unlockSounds() {
-    if (soundsReady) {
-      return;
-    }
-    soundsReady = true;
-    addSound.prime();
-    checkoutSound.prime();
-  }
-
-  // pointerdown covers a mouse and a modern iPad finger.
-  // touchend covers older iPad Safari, which may skip pointer events.
-  document.addEventListener("pointerdown", unlockSounds, true);
-  document.addEventListener("touchend", unlockSounds, true);
-
-  // The viewport tag is not enough on iPad. A pinch still sends
-  // gesturestart. Stop it so the register cannot be zoomed.
+  // Accessibility zoom stays possible. touch-action: manipulation
+  // in styles.css, plus this handler, reduces accidental double-tap
+  // zoom while a child is tapping snacks.
   document.addEventListener("gesturestart", function (event) {
     event.preventDefault();
   });

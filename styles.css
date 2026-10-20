@@ -48,7 +48,7 @@ body {
   -webkit-tap-highlight-color: transparent;
   /* The page itself does not bounce. The menu and the ticket still scroll. */
   overscroll-behavior: none;
-  /* Stops a double-tap from zooming the whole register. */
+  /* Reduces accidental double-tap zoom. Pinch zoom stays possible. */
   touch-action: manipulation;
 }
 
@@ -75,7 +75,7 @@ button {
   font: inherit;
   color: var(--ink);
   cursor: pointer;
-  /* Stops a double-tap on a tablet from zooming the page. */
+  /* Same trade-off as the page: fewer accidental zooms, pinch still works. */
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
