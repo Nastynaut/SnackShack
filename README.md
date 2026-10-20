@@ -6,16 +6,31 @@ Snack Shack is a pretend-play register for kids. One child runs the register. An
 
 The iPad needs Snack Shack at a **web address**. Do not hand the tablet a folder of files. There is no build step.
 
-The app is already on the web at:
+The app is on GitHub Pages at:
 
-**https://merry-kelpie-d061db.netlify.app/**
+**https://nastynaut.github.io/SnackShack/**
 
 It is laid out for a tablet held sideways (landscape), around 1024×768 or 1280×800.
+
+### Turn on GitHub Pages
+
+This serves the `main` branch from the root of the repo. Dustin is turning it on now. The repo needs to be public.
+
+1. Open the repo in a browser.
+2. Click **Settings**.
+3. In the left sidebar, click **Pages**.
+4. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
+5. Set **Branch** to **main** and the folder to **/ (root)**.
+6. Click **Save**.
+
+The address is **https://nastynaut.github.io/SnackShack/**.
+
+Netlify is an optional host. Its free plan adds a badge over the app.
 
 ### Add it to the iPad home screen
 
 1. On the iPad, open **Safari**.
-2. Go to **https://merry-kelpie-d061db.netlify.app/**
+2. Go to **https://nastynaut.github.io/SnackShack/**
 3. Tap the **Share** button (the square with an arrow pointing up).
 4. Tap **Add to Home Screen**.
 5. The name is **Snack Shack**. Tap **Add**.
@@ -23,24 +38,9 @@ It is laid out for a tablet held sideways (landscape), around 1024×768 or 1280�
 
 After that one online open, turn on airplane mode. The app still opens full screen, and the whole order works. It stays held sideways when Rotation Lock is on. Adding a snack and tapping **Done** still play their sounds. The home-screen picture is the Snack Shack icon already in this project.
 
-### Your own copy (optional)
-
-GitHub Pages can host a copy too.
-
-1. Put this project on GitHub. The repo can be named `SnackShack`. A free personal account needs the repo to be public.
-2. Open the repo in a browser.
-3. Click **Settings**.
-4. In the left sidebar, click **Pages**.
-5. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-6. Set **Branch** to **main** and the folder to **/ (root)**.
-7. Click **Save**.
-8. Wait about a minute, then refresh the Pages screen. GitHub shows the address at the top. It looks like `https://your-name.github.io/SnackShack/`.
-
-Use that address the same way as the steps above.
-
 ### After you change a file
 
-The home-screen app keeps the copy it already opened. To get an update, swipe the Snack Shack app closed, then open it again.
+GitHub Pages caches files for up to 10 minutes, so after a change is merged it can take about 10 minutes to show. After that, swipe the Snack Shack app closed, then open it again.
 
 To lock orientation, use iPad Rotation Lock in Control Center.
 

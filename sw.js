@@ -24,19 +24,6 @@ var NETWORK_WAIT_MS = 3000;
 var offlineUntil = 0;
 var OFFLINE_HOLD_MS = 30000;
 
-// The type each kind of file should have. A hotel or school login
-// page is HTML for every address, so a mismatch means "not our file".
-var TYPE_BY_EXT = {
-  ".html": ["text/html"],
-  ".js": ["javascript"],
-  ".css": ["text/css"],
-  ".svg": ["image/svg+xml"],
-  ".png": ["image/png"],
-  ".woff2": ["font/woff2", "application/font-woff2", "application/octet-stream"],
-  ".mp3": ["audio/mpeg"],
-  ".webmanifest": ["application/manifest+json", "application/json"]
-};
-
 // Only files the page needs while it runs. cache.addAll stops the
 // whole save if any ONE of these is missing, so notes and license
 // text stay out of this list.
@@ -131,33 +118,32 @@ function fileExtension(request) {
   return name.slice(dot).toLowerCase();
 }
 
-function typeMatches(contentType, names) {
-  for (var i = 0; i < names.length; i++) {
-    if (contentType.indexOf(names[i]) !== -1) {
-      return true;
-    }
-  }
-  return false;
-}
+// A Wi-Fi login page must never be saved over the app. Login pages
+// are HTML at every address. A page must be HTML and must contain
+// the marker from index.html. Any other file just must not be HTML.
+// Redirects and errors also count as a miss. Hosts name pictures,
+// sounds, and fonts in different ways, so we do not require one
+// exact type. One odd name would stop the whole offline save.
+var PAGE_MARKER = 'name="snack-shack-page"';
 
-// A Wi-Fi login page must never be saved over the app. Redirects,
-// errors, and the wrong kind of file all count as a miss.
 function isOurFile(request, response) {
   if (!response || !response.ok || response.redirected) {
-    return false;
+    return Promise.resolve(false);
   }
   var contentType = (response.headers.get("content-type") || "").toLowerCase();
+  var isHtml = contentType.indexOf("text/html") !== -1;
   var ext = fileExtension(request);
-  var names = TYPE_BY_EXT[ext];
-  // The home page has no extension. It must be HTML, same as a click
-  // that loads the page.
-  if (isPageLoad(request) || ext === ".html" || ext === "") {
-    names = ["text/html"];
+  var isPage = isPageLoad(request) || ext === ".html" || ext === "";
+  if (!isPage) {
+    return Promise.resolve(!isHtml);
   }
-  if (!names) {
-    return contentType.indexOf("text/html") === -1;
+  if (!isHtml) {
+    return Promise.resolve(false);
   }
-  return typeMatches(contentType, names);
+  // Read a copy. The real answer can still be shown and saved.
+  return response.clone().text().then(function (text) {
+    return text.indexOf(PAGE_MARKER) !== -1;
+  });
 }
 
 // Save one file, skipping the browser's old copy so install stores
@@ -165,10 +151,12 @@ function isOurFile(request, response) {
 function saveOne(cache, path) {
   var request = new Request(path, { cache: "reload" });
   return fetch(request).then(function (response) {
-    if (!isOurFile(request, response)) {
-      throw new Error(path);
-    }
-    return cache.put(request, response);
+    return isOurFile(request, response).then(function (ok) {
+      if (!ok) {
+        throw new Error(path);
+      }
+      return cache.put(request, response);
+    });
   });
 }
 
@@ -282,11 +270,16 @@ function networkFirst(request) {
     }, NETWORK_WAIT_MS);
 
     fetch(freshRequest(request)).then(function (response) {
+      return isOurFile(request, response).then(function (ok) {
+        return { ok: ok, response: response };
+      });
+    }).then(function (result) {
       // Throw so the catch below serves the saved copy. A login
-      // page, a redirect, or the wrong type must not be stored.
-      if (!isOurFile(request, response)) {
+      // page, a redirect, or an error must not be stored.
+      if (!result.ok) {
         throw new Error("not our file");
       }
+      var response = result.response;
       noteLiveFile();
       // The wait already ended, so the page has the saved copy.
       // Still keep this real answer for the next visit.
