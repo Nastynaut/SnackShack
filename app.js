@@ -1538,6 +1538,25 @@
     renderMenuGrid();
     renderOrder();
     showScreen();
+    // Option drawings start loading now, not when a snack is tapped.
+    if (window.SnackOptions && SnackOptions.warmIcons) {
+      // The options screen calls this with one sentence that names
+      // every missing option picture. Keep that as a single line.
+      SnackOptions.onMissingIcons = function (sentence) {
+        var i;
+        for (i = menuProblems.length - 1; i >= 0; i--) {
+          if (menuProblems[i].indexOf("These option pictures didn't load:") === 0) {
+            menuProblems.splice(i, 1);
+          }
+        }
+        addMenuProblem(sentence);
+      };
+      var allItems = [];
+      for (var key in itemsById) {
+        allItems.push(itemsById[key]);
+      }
+      SnackOptions.warmIcons(allItems);
+    }
   }
 
   init();

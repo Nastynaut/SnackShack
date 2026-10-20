@@ -20,8 +20,14 @@
   // The snack we are picking for right now. Null when the screen is closed.
   var session = null;
 
-  // One warning per missing icon, so a broken file does not spam the console.
+  // One note per missing file, so a broken icon does not repeat.
   var missingIcons = {};
+  var missingIconPaths = [];
+
+  // Drawings that have already loaded. The browser keeps the file,
+  // so the next time this screen opens it can show the drawing
+  // right away instead of the emoji for a moment.
+  var loadedIcons = {};
 
   // ----------------------------------------------------------
   // Reading menu.js
@@ -273,8 +279,26 @@
     }
   }
 
+  // One short sentence for the yellow note, naming every missing file.
+  // A second missing file updates that same sentence.
+  function reportMissingIcon(image) {
+    if (missingIcons[image]) {
+      return;
+    }
+    missingIcons[image] = true;
+    missingIconPaths.push(image);
+    var sentence = "These option pictures didn't load: " + missingIconPaths.join(", ") + ".";
+    if (window.SnackOptions && typeof SnackOptions.onMissingIcons === "function") {
+      SnackOptions.onMissingIcons(sentence);
+      return;
+    }
+    console.warn(sentence);
+  }
+
   // Same idea as the menu pictures: try the drawing, keep the emoji if it is missing.
-  function fillPicture(container, image, emoji, label) {
+  // noteIfMissing is true for toppings and flavors. Their missing files
+  // go in the yellow note. The big snack picture has its own note.
+  function fillPicture(container, image, emoji, noteIfMissing) {
     clearChildren(container);
     var emojiEl = document.createElement("span");
     emojiEl.className = "emoji";
@@ -288,23 +312,22 @@
 
     var img = document.createElement("img");
     img.alt = "";
-    img.hidden = true;
+    // Already loaded once this visit: show the drawing immediately.
+    // Otherwise the emoji flashes before the picture arrives.
+    var known = loadedIcons[image] === true;
+    img.hidden = !known;
+    emojiEl.hidden = known;
     img.addEventListener("load", function () {
+      loadedIcons[image] = true;
       img.hidden = false;
       emojiEl.hidden = true;
     });
     img.addEventListener("error", function () {
       img.hidden = true;
       emojiEl.hidden = false;
-      if (!missingIcons[image]) {
-        missingIcons[image] = true;
-        console.warn(
-          (label || "An option") +
-            "'s icon didn't load (" +
-            image +
-            "). " +
-            (emoji ? "The emoji is showing instead." : "The name is showing instead.")
-        );
+      loadedIcons[image] = false;
+      if (noteIfMissing) {
+        reportMissingIcon(image);
       }
     });
     // setAttribute keeps the path relative (img.src would store a full address).
@@ -360,7 +383,7 @@
     var icon = document.createElement("span");
     icon.className = "option-icon";
     icon.setAttribute("aria-hidden", "true");
-    fillPicture(icon, choice.icon, choice.emoji, choice.name);
+    fillPicture(icon, choice.icon, choice.emoji, true);
 
     var name = document.createElement("span");
     name.className = "option-name";
@@ -396,7 +419,7 @@
     };
 
     titleEl.textContent = item.name;
-    fillPicture(pictureEl, item.image, item.emoji, item.name);
+    fillPicture(pictureEl, item.image, item.emoji, false);
     addLabel.textContent = options.confirmLabel || "Add to Ticket";
     clearChildren(groupsEl);
 
@@ -547,7 +570,46 @@
     cancel();
   });
 
+  // Start loading every option drawing in the background, so the
+  // first time a snack opens its pictures are already here.
+  // The snack's own picture is included, so the big picture at the
+  // top of this screen is ready too.
+  function warmIcons(items) {
+    var i, g, c;
+    for (i = 0; i < items.length; i++) {
+      warmOne(items[i].image, false);
+      var groups = items[i].optionGroups || [];
+      for (g = 0; g < groups.length; g++) {
+        var choices = groups[g].choices || [];
+        for (c = 0; c < choices.length; c++) {
+          warmOne(choices[c].icon, true);
+        }
+      }
+    }
+  }
+
+  // A hidden copy of the file. It is not a button. It just asks the
+  // browser to fetch the drawing now.
+  function warmOne(path, noteIfMissing) {
+    if (!path || loadedIcons[path] !== undefined) {
+      return;
+    }
+    loadedIcons[path] = "loading";
+    var probe = new Image();
+    probe.onload = function () {
+      loadedIcons[path] = true;
+    };
+    probe.onerror = function () {
+      loadedIcons[path] = false;
+      if (noteIfMissing) {
+        reportMissingIcon(path);
+      }
+    };
+    probe.src = path;
+  }
+
   window.SnackOptions = {
+    warmIcons: warmIcons,
     clean: clean,
     hasOptions: hasOptions,
     normalize: normalize,

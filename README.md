@@ -86,7 +86,7 @@ Snacks that need a choice have an `options` list in `menu.js`. Each group in tha
 - `pick: "many"` — toppings. Tap any combination. None selected shows as **Plain** on the ticket.
 - `pick: "one"` — a flavor, or Ice / No ice. The first choice starts selected, so **Add to Ticket** is never stuck.
 
-Each choice has an `id`, a `name`, an `icon` (a file in `assets/options/`), and an `emoji`. If the icon file is missing, the emoji shows. If that is missing too, the name stays. Options are free. They do not change the price.
+Each choice has an `id`, a `name`, an `icon` (a file in `assets/options/`), and an `emoji`. If the icon file is missing, the emoji shows, and the yellow note names that file in one sentence. If the emoji is missing too, the name stays. Options are free. They do not change the price.
 
 Burger and Cheeseburger share the `BURGER_TOPPINGS` list. Edit it once and both change. Milkshake and Ice Cream Cone share `SHAKE_FLAVORS`. The hot dog has its own list.
 

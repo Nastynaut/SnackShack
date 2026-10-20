@@ -1972,6 +1972,23 @@ async function runPartialFirstInstall(browser, browserName, server, base, label)
   }
 }
 
+// The drawings should be on screen before a screenshot, not the emoji.
+async function waitForOptionDrawings(page) {
+  await page.waitForFunction(() => {
+    const imgs = document.querySelectorAll("#options-screen .option-icon img");
+    if (imgs.length < 7) {
+      return false;
+    }
+    for (let i = 0; i < imgs.length; i++) {
+      const img = imgs[i];
+      if (img.hidden || !img.complete || img.naturalWidth < 1) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
 async function openSnackOptions(page, id) {
   const button = page.locator(`.menu-item[data-id="${id}"]`);
   if (!(await button.isVisible())) {
@@ -2110,9 +2127,41 @@ async function runOptions(browser, browserName) {
   const label = browserName + " options";
   try {
     await page.goto(BASE, { waitUntil: "load" });
+    // Ketchup's drawing is requested at startup, before any tap.
+    await page.waitForFunction(() =>
+      performance.getEntriesByType("resource").some((entry) => entry.name.indexOf("assets/options/ketchup.svg") !== -1)
+    );
+    await page.evaluate(() => {
+      window.__iconSeen = [];
+      const root = document.getElementById("options-groups");
+      const obs = new MutationObserver(() => {
+        const button = document.querySelector('#options-screen [data-option-id="ketchup"]');
+        if (!button) {
+          return;
+        }
+        const img = button.querySelector("img");
+        const emoji = button.querySelector(".emoji");
+        if (!img || !emoji) {
+          return;
+        }
+        window.__iconSeen.push({ imgHidden: img.hidden, emojiHidden: emoji.hidden });
+      });
+      obs.observe(root, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden"]
+      });
+    });
     await page.locator('.menu-item[data-id="burger"]').click();
     await page.locator("#options-screen").waitFor({ state: "visible" });
     await page.waitForFunction(() => document.activeElement && document.activeElement.id === "options-title");
+    const firstPaint = await page.evaluate(() => (window.__iconSeen || [])[0] || null);
+    check(
+      label + " a preloaded icon is already showing",
+      !!(firstPaint && firstPaint.imgHidden === false && firstPaint.emojiHidden === true),
+      JSON.stringify(firstPaint)
+    );
     const toppings = ["ketchup", "mustard", "mayo", "pickles", "lettuce", "tomato", "onion"];
     for (const id of toppings) {
       const count = await page.locator(`[data-option-id="${id}"]`).count();
@@ -2136,7 +2185,16 @@ async function runOptions(browser, browserName) {
       backFocus
     );
 
+    await page.evaluate(() => {
+      window.__iconSeen = [];
+    });
     await openSnackOptions(page, "burger");
+    const reopened = await page.evaluate(() => (window.__iconSeen || [])[0] || null);
+    check(
+      label + " a loaded icon shows with no emoji flash",
+      !!(reopened && reopened.imgHidden === false && reopened.emojiHidden === true),
+      JSON.stringify(reopened)
+    );
     await page.locator("#options-add").click();
     await page.locator("#options-screen").waitFor({ state: "hidden" });
     await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
@@ -2249,17 +2307,19 @@ async function runOptions(browser, browserName) {
     await page.locator("#options-screen").waitFor({ state: "hidden" });
 
     if (browserName === "chromium") {
-      const shotDir = "/opt/cursor/artifacts/screenshots";
+      const shotDir = join(ARTIFACTS, "screenshots");
       mkdirSync(shotDir, { recursive: true });
       await openSnackOptions(page, "burger");
       await page.locator('[data-option-id="ketchup"]').click();
       await page.locator('[data-option-id="pickles"]').click();
+      await waitForOptionDrawings(page);
       await page.screenshot({ path: join(shotDir, "options_landscape.png") });
       await page.locator("#options-back").click();
       await page.locator("#options-screen").waitFor({ state: "hidden" });
       await page.screenshot({ path: join(shotDir, "ticket_landscape.png") });
       await page.setViewportSize({ width: 768, height: 1024 });
       await openSnackOptions(page, "burger");
+      await waitForOptionDrawings(page);
       await page.screenshot({ path: join(shotDir, "options_portrait.png") });
       await page.locator("#options-back").click();
       await page.locator("#options-screen").waitFor({ state: "hidden" });
@@ -2287,6 +2347,10 @@ async function runOptions(browser, browserName) {
     body = body.replace(
       'icon: "assets/options/mayo.svg"',
       'icon: "assets/options/missing-mayo.svg"'
+    );
+    body = body.replace(
+      'icon: "assets/options/relish.svg"',
+      'icon: "assets/options/missing-relish.svg"'
     );
     body = body.replace(
       'image: "assets/food/fries.svg"\n        },',
@@ -2330,6 +2394,24 @@ async function runOptions(browser, browserName) {
       return !!(img && img.hidden && emoji && !emoji.hidden && emoji.textContent);
     });
     check(browserName + " options a missing icon falls back to emoji", true);
+    await badPage.waitForFunction(() => {
+      const note = document.querySelector("#menu-note");
+      if (!note) {
+        return false;
+      }
+      const text = note.textContent || "";
+      return text.indexOf("assets/options/missing-mayo.svg") !== -1 && text.indexOf("assets/options/missing-relish.svg") !== -1;
+    });
+    const iconLines = await badPage.locator("#menu-note-body p").evaluateAll((nodes) =>
+      nodes.map((node) => node.textContent).filter((text) => text.indexOf("These option pictures didn't load:") === 0)
+    );
+    check(
+      browserName + " options missing icons share one yellow-note sentence",
+      iconLines.length === 1 &&
+        iconLines[0].indexOf("assets/options/missing-mayo.svg") !== -1 &&
+        iconLines[0].indexOf("assets/options/missing-relish.svg") !== -1,
+      JSON.stringify(iconLines)
+    );
     check(browserName + " options bad data does not crash", badPage.__errors.length === 0, badPage.__errors.join(" | "));
   } finally {
     await badContext.close();

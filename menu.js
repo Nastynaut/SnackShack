@@ -45,7 +45,8 @@
 //     id      Letters, numbers, and dashes only. Unique on that snack.
 //     name    The word on the button and on the ticket.
 //     icon    A drawing in assets/options/. If the file is missing,
-//             the emoji shows. If that is missing too, the name stays.
+//             the emoji shows, and the yellow note names that file.
+//             If the emoji is missing too, the name stays.
 //     emoji   The backup picture.
 //
 // Options are free. They do not change the price.
@@ -65,7 +66,9 @@ var BURGER_TOPPINGS = [
     id: "ketchup",
     name: "Ketchup",
     icon: "assets/options/ketchup.svg",
-    emoji: "🍅"
+    // A ketchup bottle, not a tomato. Tomato below uses 🍅, so a
+    // missing drawing still looks different for each topping.
+    emoji: "🥫"
   },
   {
     id: "mustard",
@@ -112,7 +115,8 @@ var HOT_DOG_TOPPINGS = [
     id: "ketchup",
     name: "Ketchup",
     icon: "assets/options/ketchup.svg",
-    emoji: "🍅"
+    // Same ketchup bottle as the burger topping, not a tomato.
+    emoji: "🥫"
   },
   {
     id: "mustard",
