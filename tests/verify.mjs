@@ -47,6 +47,18 @@ const swSource = readFileSync(join(ROOT, "sw.js"), "utf8");
 const appFiles = [...swSource.match(/var APP_FILES = \[([\s\S]*?)\];/)[1].matchAll(/"([^"]+)"/g)].map(
   (match) => match[1]
 );
+const versionMatch = swSource.match(/^var CACHE_VERSION = "(\d+)";/m);
+const CACHE_VERSION = versionMatch ? Number(versionMatch[1]) : 0;
+const LIVE_CACHE = "snack-shack-" + CACHE_VERSION;
+const NEXT_CACHE = "snack-shack-" + (CACHE_VERSION + 1);
+const NEWER_CACHE = "snack-shack-" + (CACHE_VERSION + 2);
+
+function withNextCacheVersion(source, note) {
+  return source.replace(
+    'var CACHE_VERSION = "' + CACHE_VERSION + '";',
+    'var CACHE_VERSION = "' + (CACHE_VERSION + 1) + '"; // ' + note
+  );
+}
 
 function walk(dir) {
   const out = [];
@@ -320,7 +332,7 @@ function track(page, origin) {
 }
 
 async function waitForCache(page, cacheName) {
-  const name = cacheName || "snack-shack-1";
+  const name = cacheName || LIVE_CACHE;
   const start = Date.now();
   while (Date.now() - start < 20000) {
     const ready = await page.evaluate(async ({ expected, name }) => {
@@ -416,16 +428,31 @@ async function readManifest(page) {
   });
 }
 
+// Snacks with options open a screen. Add to Ticket finishes the add.
+// Snacks without options still land on the ticket from the one tap.
+async function addFromMenu(page, id) {
+  const before = await page.locator("#ticket-total").textContent();
+  await page.locator(`.menu-item[data-id="${id}"]`).click();
+  if (await page.locator("#options-screen").isVisible()) {
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+  }
+  await page.waitForFunction((start) => {
+    const total = document.querySelector("#ticket-total");
+    return total && total.textContent !== start;
+  }, before);
+}
+
 async function orderFlow(page, label) {
   const errorsBefore = page.__errors.length;
-  await page.locator('.menu-item[data-id="burger"]').click();
+  await addFromMenu(page, "burger");
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
   await page.locator('[data-action="plus"][data-id="burger"]').click();
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$6");
   await page.locator('[data-action="minus"][data-id="burger"]').click();
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
   await page.locator('.tab[data-category="drinks"]').click();
-  await page.locator('.menu-item[data-id="soda"]').click();
+  await addFromMenu(page, "soda");
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$4");
   await page.locator("#done-button").click();
   await page.waitForFunction(() => {
@@ -481,7 +508,7 @@ async function runSize(browser, browserName, width, height) {
     }
   }
   check(label + " service worker cache holds every app file", missing.length === 0, missing.join(", "));
-  check(label + " cache version is the current one", cache.names.indexOf("snack-shack-1") !== -1, cache.names.join(", "));
+  check(label + " cache version is the current one", cache.names.indexOf(LIVE_CACHE) !== -1, cache.names.join(", "));
   const iconPaths = [
     "assets/icons/apple-touch-icon-180.png",
     "assets/icons/icon-192.png",
@@ -546,10 +573,12 @@ async function runSize(browser, browserName, width, height) {
   check(label + " gesturestart blocks pinch zoom on iOS on purpose", info.gesturePrevented === true);
   check(label + " menu and ticket still scroll inside", info.gridOverflow === "auto" && info.gridOverscroll === "contain" && info.ticketOverflow === "auto" && info.ticketOverscroll === "contain");
 
+  await checkOptionsLayout(page, label, width, height);
+
   if (width === 1180 && height === 820 && browserName === "chromium") {
     await context.setOffline(true);
     await page.reload({ waitUntil: "load" });
-    await page.locator('.menu-item[data-id="burger"]').click();
+    await addFromMenu(page, "burger");
     await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
     await page.screenshot({ path: join(ARTIFACTS, "offline_menu_1180x820.png") });
     await context.setOffline(false);
@@ -643,6 +672,14 @@ async function runSubfolder(browser, browserName) {
   check(label + " cache holds the app files", missing.length === 0, missing.join(", "));
   const info = await readManifest(page);
   check(label + " manifest still uses relative start and scope", info.json.start_url === "./" && info.json.scope === "./");
+  await page.locator('.menu-item[data-id="burger"]').click();
+  await page.locator("#options-screen").waitFor({ state: "visible" });
+  const iconSrc = await page.locator('[data-option-id="ketchup"] img').getAttribute("src");
+  check(label + " option icon path stays relative", iconSrc === "assets/options/ketchup.svg", iconSrc || "");
+  await page.locator("#options-back").click();
+  await page.locator("#options-screen").waitFor({ state: "hidden" });
+  const subTotal = await page.locator("#ticket-total").textContent();
+  check(label + " Back from options adds nothing", subTotal === "$0", subTotal);
   await runHostChecks(page, context, subServer, SUB_BASE, label);
   await context.setOffline(true);
   const reloadError = await page.reload({ waitUntil: "load" }).catch((err) => err);
@@ -695,7 +732,8 @@ async function runLogic(browser, browserName) {
     const buttons = page.locator("#menu-grid .menu-item");
     const count = await buttons.count();
     for (let i = 0; i < count; i++) {
-      await buttons.nth(i).click();
+      const id = await buttons.nth(i).getAttribute("data-id");
+      await addFromMenu(page, id);
     }
   }
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$26");
@@ -726,7 +764,7 @@ async function runLogic(browser, browserName) {
   await page.locator('[data-action="minus"][data-id="burger"]').click();
   await page.locator("#done-button").click();
   await page.locator("#new-order").click();
-  await page.locator('.menu-item[data-id="burger"]').click();
+  await addFromMenu(page, "burger");
   await page.locator('[data-action="minus"][data-id="burger"]').click();
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$0");
   const focusedTab = await page.evaluate(() => {
@@ -743,7 +781,7 @@ async function runLogic(browser, browserName) {
       throw new Error("play boom");
     };
   });
-  await page.locator('.menu-item[data-id="burger"]').click();
+  await addFromMenu(page, "burger");
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
   const thrownTotal = await page.locator("#ticket-total").textContent();
   check(browserName + " a throwing play() still adds the snack", thrownTotal === "$3", thrownTotal);
@@ -767,7 +805,7 @@ async function runFilePage(browser, browserName) {
     await context.close();
     return;
   }
-  await page.locator('.menu-item[data-id="burger"]').click();
+  await addFromMenu(page, "burger");
   await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
   const regs = await page.evaluate(async () => {
     try {
@@ -809,14 +847,14 @@ async function runReviewChecks(browser, browserName) {
   writeFileSync(cssPath, originalCss + "\n/* updated-marker */\n");
   let fresh;
   try {
-    fresh = await page.evaluate(async () => {
+    fresh = await page.evaluate(async (cacheName) => {
       const res = await fetch("styles.css");
       const text = await res.text();
-      const opened = await caches.open("snack-shack-1");
+      const opened = await caches.open(cacheName);
       const saved = await opened.match("styles.css");
       const savedText = saved ? await saved.text() : "";
       return { text: text, savedText: savedText };
-    });
+    }, LIVE_CACHE);
   } finally {
     writeFileSync(cssPath, originalCss);
   }
@@ -867,13 +905,38 @@ async function runReviewChecks(browser, browserName) {
 
   await runLateNavigation(page, label);
   await runPortalAndHang(page, context, label);
+  const ranged = await page.evaluate(async () => {
+    const missed = await fetch("no-such-sound.mp3", { headers: { Range: "bytes=0-10" } });
+    const missedText = await missed.text();
+    const hit = await fetch("assets/sounds/add.mp3", { headers: { Range: "bytes=0-3" } });
+    const hitBuf = await hit.arrayBuffer();
+    return {
+      missStatus: missed.status,
+      missRange: missed.headers.get("content-range"),
+      missText: missedText,
+      hitStatus: hit.status,
+      hitLen: hitBuf.byteLength
+    };
+  });
+  check(
+    label + " a range miss returns the error, not a 206 slice",
+    ranged.missStatus === 404 &&
+      !ranged.missRange &&
+      ranged.missText.indexOf("not found") !== -1,
+    JSON.stringify(ranged)
+  );
+  check(
+    label + " a cached sound range is still a 206",
+    ranged.hitStatus === 206 && ranged.hitLen === 4,
+    JSON.stringify(ranged)
+  );
   check(label + " no page errors", page.__errors.length === 0, page.__errors.join(" | "));
   await context.close();
 }
 
 async function cacheStory(page) {
-  return page.evaluate(async () => {
-    const cache = await caches.open("snack-shack-1");
+  return page.evaluate(async (cacheName) => {
+    const cache = await caches.open(cacheName);
     const keys = await cache.keys();
     let portal = false;
     let html = false;
@@ -900,12 +963,12 @@ async function cacheStory(page) {
       }
     }
     return { portal: portal, html: html, css: css, menu: menu, count: keys.length };
-  });
+  }, LIVE_CACHE);
 }
 
 async function runHostChecks(page, context, server, base, label) {
-  const types = await page.evaluate(async () => {
-    const cache = await caches.open("snack-shack-1");
+  const types = await page.evaluate(async (cacheName) => {
+    const cache = await caches.open(cacheName);
     const mp3 = await cache.match("assets/sounds/add.mp3");
     const manifest = await cache.match("manifest.webmanifest");
     const keys = await cache.keys();
@@ -914,7 +977,7 @@ async function runHostChecks(page, context, server, base, label) {
       manifest: manifest ? manifest.headers.get("content-type") || "" : "",
       count: keys.length
     };
-  });
+  }, LIVE_CACHE);
   check(
     label + " host headers still install (audio/mp3, octet-stream manifest)",
     types.count >= appFiles.length &&
@@ -931,10 +994,10 @@ async function runHostChecks(page, context, server, base, label) {
   writeFileSync(htmlPath, originalHtml + "\n<!-- fresh-page-marker -->\n");
   let fresh;
   try {
-    fresh = await page.evaluate(async () => {
+    fresh = await page.evaluate(async (cacheName) => {
       const home = await (await fetch("./")).text();
       const file = await (await fetch("index.html")).text();
-      const cache = await caches.open("snack-shack-1");
+      const cache = await caches.open(cacheName);
       const savedHome = await (await cache.match("./")).text();
       const savedFile = await (await cache.match("index.html")).text();
       const shown = (text) =>
@@ -947,7 +1010,7 @@ async function runHostChecks(page, context, server, base, label) {
         savedHome: saved(savedHome),
         savedFile: saved(savedFile)
       };
-    });
+    }, LIVE_CACHE);
   } finally {
     writeFileSync(htmlPath, originalHtml);
   }
@@ -961,8 +1024,8 @@ async function runHostChecks(page, context, server, base, label) {
   let login;
   try {
     await page.goto(base, { waitUntil: "load" });
-    login = await page.evaluate(async () => {
-      const cache = await caches.open("snack-shack-1");
+    login = await page.evaluate(async (cacheName) => {
+      const cache = await caches.open(cacheName);
       const savedHome = await (await cache.match("./")).text();
       const savedFile = await (await cache.match("index.html")).text();
       const safe = (text) =>
@@ -974,7 +1037,7 @@ async function runHostChecks(page, context, server, base, label) {
         savedHome: safe(savedHome),
         savedFile: safe(savedFile)
       };
-    });
+    }, LIVE_CACHE);
   } finally {
     server.clearPortal();
   }
@@ -1033,10 +1096,10 @@ async function runPortalAndHang(page, context, label) {
   rootServer.portal("wrong-type");
   let wrong;
   try {
-    wrong = await page.evaluate(async () => {
+    wrong = await page.evaluate(async (cacheName) => {
       const css = await (await fetch("styles.css")).text();
       const js = await (await fetch("menu.js")).text();
-      const cache = await caches.open("snack-shack-1");
+      const cache = await caches.open(cacheName);
       const savedCss = await (await cache.match("styles.css")).text();
       const savedJs = await (await cache.match("menu.js")).text();
       return {
@@ -1045,7 +1108,7 @@ async function runPortalAndHang(page, context, label) {
         savedCss: savedCss.indexOf("SNACK SHACK") !== -1 && savedCss.indexOf("Wi-Fi login") === -1,
         savedJs: savedJs.indexOf("var MENU") !== -1 && savedJs.indexOf("Wi-Fi login") === -1
       };
-    });
+    }, LIVE_CACHE);
   } finally {
     rootServer.clearPortal();
   }
@@ -1071,7 +1134,7 @@ async function runPortalAndHang(page, context, label) {
   rootServer.portal("install-bad");
   let installResult;
   try {
-    installResult = await page.evaluate(async () => {
+    installResult = await page.evaluate(async (cacheName) => {
       const reg = await navigator.serviceWorker.getRegistration();
       let error = "";
       try {
@@ -1083,7 +1146,7 @@ async function runPortalAndHang(page, context, label) {
       while (reg.installing && Date.now() - start < 4000) {
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
-      const cache = await caches.open("snack-shack-1");
+      const cache = await caches.open(cacheName);
       const keys = await cache.keys();
       let portal = false;
       let html = false;
@@ -1107,7 +1170,7 @@ async function runPortalAndHang(page, context, label) {
         portal: portal,
         html: html
       };
-    });
+    }, LIVE_CACHE);
   } finally {
     rootServer.clearPortal();
     writeFileSync(swPath, originalSw);
@@ -1144,8 +1207,37 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Plant cache entries the activate step must keep or delete.
+// Chromium can run this inside the service worker. WebKit does not
+// hand the worker to the test, so the open page writes them instead.
+// On WebKit the release check uses a saved profile (see
+// runReleaseChecks) so those entries are still there after the app
+// tab closes. A temporary WebKit window drops them.
+async function seedCachesFromWorker(context, entries) {
+  const worker = context.serviceWorkers()[0];
+  if (worker) {
+    await worker.evaluate(async (jobs) => {
+      for (let i = 0; i < jobs.length; i++) {
+        const cache = await caches.open(jobs[i].name);
+        await cache.put(jobs[i].path, new Response(jobs[i].body));
+      }
+    }, entries);
+    return;
+  }
+  const page = context.pages().find((item) => item.url().indexOf("http") === 0);
+  if (!page) {
+    throw new Error("No page is open, so caches cannot be seeded");
+  }
+  await page.evaluate(async (jobs) => {
+    for (let i = 0; i < jobs.length; i++) {
+      const cache = await caches.open(jobs[i].name);
+      await cache.put(jobs[i].path, new Response(jobs[i].body));
+    }
+  }, entries);
+}
+
 async function workerSnapshot(page) {
-  return page.evaluate(async () => {
+  return page.evaluate(async ({ live, next }) => {
     const reg = await navigator.serviceWorker.getRegistration();
     const names = await caches.keys();
     async function fileCount(name) {
@@ -1180,16 +1272,16 @@ async function workerSnapshot(page) {
       active: reg && reg.active ? reg.active.state : "",
       controlled: !!navigator.serviceWorker.controller,
       names: names,
-      v1: await fileCount("snack-shack-1"),
-      v2: await fileCount("snack-shack-2"),
-      v1core: await hasCore("snack-shack-1"),
-      v2core: await hasCore("snack-shack-2"),
+      v1: await fileCount(live),
+      v2: await fileCount(next),
+      v1core: await hasCore(live),
+      v2core: await hasCore(next),
       installingCache: names.filter((name) => name.indexOf("-installing") !== -1),
       other: other,
       stillHere: window.__stillHere || 0,
       total: total ? total.textContent : ""
     };
-  });
+  }, { live: LIVE_CACHE, next: NEXT_CACHE });
 }
 
 // Ask the browser to look for a new sw.js, then wait until that
@@ -1274,10 +1366,27 @@ async function runLateNavigation(page, label) {
 // v1 stays up while a bad v2 install fails. A good v2 then waits.
 // Closing every tab lets v2 take over its own cache.
 async function runReleaseChecks(browser, browserName) {
-  const context = await browser.newContext({
+  // WebKit drops caches the page wrote when its last tab closes, and
+  // the test cannot run code inside that browser's service worker.
+  // A saved profile keeps the planted entries. One blank tab stays
+  // open so closing the app tab does not shut the profile down.
+  const contextOptions = {
     viewport: { width: 1024, height: 768 },
     serviceWorkers: "allow"
-  });
+  };
+  let context;
+  let userDataDir = "";
+  let keeper = null;
+  if (browserName === "webkit") {
+    userDataDir = mkdtempSync(join(tmpdir(), "snack-webkit-"));
+    context = await webkit.launchPersistentContext(userDataDir, contextOptions);
+    keeper = context.pages()[0] || (await context.newPage());
+    if (keeper.url() !== "about:blank") {
+      await keeper.goto("about:blank");
+    }
+  } else {
+    context = await browser.newContext(contextOptions);
+  }
   let page = await context.newPage();
   const origin = new URL(BASE).origin;
   page.__errors = track(page, origin);
@@ -1293,16 +1402,15 @@ async function runReleaseChecks(browser, browserName) {
     await page.evaluate(() => {
       window.__stillHere = 1;
     });
-    await page.locator('.menu-item[data-id="burger"]').click();
+    await addFromMenu(page, "burger");
     await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
-    await page.evaluate(async () => {
-      const cache = await caches.open("other-app-cache");
-      await cache.put("other-app.txt", new Response("keep-me"));
-    });
+    await seedCachesFromWorker(context, [
+      { name: "other-app-cache", path: "other-app.txt", body: "keep-me" }
+    ]);
 
     writeFileSync(
       swPath,
-      original.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // release-fail')
+      withNextCacheVersion(original, "release-fail")
     );
     rootServer.portal("partial");
     let failedState = "timeout";
@@ -1312,7 +1420,7 @@ async function runReleaseChecks(browser, browserName) {
       rootServer.clearPortal();
     }
     const failed = await workerSnapshot(page);
-    const half = failed.names.filter((name) => name.indexOf("snack-shack-2") === 0);
+    const half = failed.names.filter((name) => name.indexOf(NEXT_CACHE) === 0);
     check(
       label + " a portal mid-install fails and leaves no half-filled cache",
       failedState === "redundant" &&
@@ -1346,7 +1454,7 @@ async function runReleaseChecks(browser, browserName) {
     await page.evaluate(() => {
       window.__stillHere = 1;
     });
-    await page.locator('.menu-item[data-id="burger"]').click();
+    await addFromMenu(page, "burger");
     await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
 
     writeFileSync(appFile("app.js"), originalApp + "\n/* v2-app */\n");
@@ -1354,7 +1462,7 @@ async function runReleaseChecks(browser, browserName) {
     writeFileSync(appFile("assets/food/cookie.svg"), originalCookie + "<!-- v2-cookie -->");
     writeFileSync(
       swPath,
-      original.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // release-ok')
+      withNextCacheVersion(original, "release-ok")
     );
     // Confirm the new app.js is already on the server. The 30 second
     // hold only changes runtime fallback. It does not change install.
@@ -1400,17 +1508,21 @@ async function runReleaseChecks(browser, browserName) {
 
     // v2 is waiting, so it has not activated yet. Plant a newer release
     // and an older side cache. Activate should drop only the older ones.
-    await page.evaluate(async () => {
-      const newer = await caches.open("snack-shack-3");
-      await newer.put("newer.txt", new Response("keep-newer"));
-      const installing = await caches.open("snack-shack-3-installing");
-      await installing.put("installing.txt", new Response("keep-installing"));
-      const olderSide = await caches.open("snack-shack-1-installing");
-      await olderSide.put("old-side.txt", new Response("drop-me"));
-    });
+    // WebKit drops cache entries written by the page once every tab
+    // closes. Writing them from the service worker keeps them.
+    await seedCachesFromWorker(context, [
+      { name: NEWER_CACHE, path: "newer.txt", body: "keep-newer" },
+      { name: NEWER_CACHE + "-installing", path: "installing.txt", body: "keep-installing" },
+      { name: LIVE_CACHE + "-installing", path: "old-side.txt", body: "drop-me" }
+    ]);
 
     await page.close();
     for (const extra of context.pages()) {
+      // The blank tab is not the app. Leave it so the saved profile
+      // stays open. The app's own tab is already closed.
+      if (keeper && extra === keeper) {
+        continue;
+      }
       await extra.close();
     }
     await sleep(500);
@@ -1426,14 +1538,14 @@ async function runReleaseChecks(browser, browserName) {
         !after.waiting &&
         after.controlled &&
         after.v2core &&
-        after.names.indexOf("snack-shack-1") === -1
+        after.names.indexOf(LIVE_CACHE) === -1
       ) {
         break;
       }
       await sleep(200);
     }
     const burgers = await page.locator('.menu-item[data-id="burger"]').count();
-    const kept = await page.evaluate(async () => {
+    const kept = await page.evaluate(async (newerName) => {
       const names = await caches.keys();
       async function texts(name) {
         if (names.indexOf(name) === -1) {
@@ -1449,19 +1561,19 @@ async function runReleaseChecks(browser, browserName) {
         return out;
       }
       return {
-        newer: await texts("snack-shack-3"),
-        installing: await texts("snack-shack-3-installing")
+        newer: await texts(newerName),
+        installing: await texts(newerName + "-installing")
       };
-    });
+    }, NEWER_CACHE);
     check(
       label + " after every tab is closed the v2 worker is active on its own cache",
       after.active === "activated" &&
         !after.waiting &&
         after.controlled &&
         after.v2 >= appFiles.length &&
-        after.names.indexOf("snack-shack-1") === -1 &&
-        after.names.indexOf("snack-shack-1-installing") === -1 &&
-        after.names.indexOf("snack-shack-2") !== -1 &&
+        after.names.indexOf(LIVE_CACHE) === -1 &&
+        after.names.indexOf(LIVE_CACHE + "-installing") === -1 &&
+        after.names.indexOf(NEXT_CACHE) !== -1 &&
         after.other === "keep-me" &&
         burgers > 0,
       JSON.stringify(after) + " burgers " + burgers
@@ -1470,10 +1582,10 @@ async function runReleaseChecks(browser, browserName) {
     const installingKept = keptFile(kept.installing, "installing.txt", "keep-installing");
     check(
       label + " activate deletes older copies and keeps a newer install",
-      after.names.indexOf("snack-shack-1") === -1 &&
-        after.names.indexOf("snack-shack-1-installing") === -1 &&
-        after.names.indexOf("snack-shack-3") !== -1 &&
-        after.names.indexOf("snack-shack-3-installing") !== -1 &&
+      after.names.indexOf(LIVE_CACHE) === -1 &&
+        after.names.indexOf(LIVE_CACHE + "-installing") === -1 &&
+        after.names.indexOf(NEWER_CACHE) !== -1 &&
+        after.names.indexOf(NEWER_CACHE + "-installing") !== -1 &&
         newerKept &&
         installingKept,
       JSON.stringify({ names: after.names, kept: kept })
@@ -1499,7 +1611,12 @@ async function runReleaseChecks(browser, browserName) {
     writeFileSync(appFile("menu.js"), originalMenu);
     writeFileSync(appFile("assets/food/cookie.svg"), originalCookie);
     rootServer.clearPortal();
-    await context.close();
+    if (context) {
+      await context.close();
+    }
+    if (userDataDir) {
+      rmSync(userDataDir, { recursive: true, force: true });
+    }
   }
 }
 
@@ -1521,7 +1638,7 @@ function releaseMarks(app, menu, cookie) {
 }
 
 async function readReleaseFiles(page) {
-  return page.evaluate(async () => {
+  return page.evaluate(async ({ live, next }) => {
     async function body(path) {
       try {
         const res = await fetch(path);
@@ -1543,14 +1660,14 @@ async function readReleaseFiles(page) {
       app: await body("app.js"),
       menu: await body("menu.js"),
       cookie: await body("assets/food/cookie.svg"),
-      v1app: await saved("snack-shack-1", "app.js"),
-      v1menu: await saved("snack-shack-1", "menu.js"),
-      v1cookie: await saved("snack-shack-1", "assets/food/cookie.svg"),
-      v2app: await saved("snack-shack-2", "app.js"),
-      v2menu: await saved("snack-shack-2", "menu.js"),
-      v2cookie: await saved("snack-shack-2", "assets/food/cookie.svg")
+      v1app: await saved(live, "app.js"),
+      v1menu: await saved(live, "menu.js"),
+      v1cookie: await saved(live, "assets/food/cookie.svg"),
+      v2app: await saved(next, "app.js"),
+      v2menu: await saved(next, "menu.js"),
+      v2cookie: await saved(next, "assets/food/cookie.svg")
     };
-  });
+  }, { live: LIVE_CACHE, next: NEXT_CACHE });
 }
 
 // The open tab sees the newer files while online, then reloads offline.
@@ -1578,7 +1695,7 @@ async function runOfflineReload(browser, browserName) {
     writeFileSync(appFile("index.html"), originalHtml.replace("</body>", "<!-- v2-page --></body>"));
     writeFileSync(
       swPath,
-      originalSw.replace('var CACHE_VERSION = "1";', 'var CACHE_VERSION = "2"; // live-copy')
+      withNextCacheVersion(originalSw, "live-copy")
     );
     const state = await updateAndSettle(page, 20000);
     const waiting = await workerSnapshot(page);
@@ -1719,7 +1836,7 @@ async function runNoBump(browser, browserName) {
 // First visit, with no saved copy yet. A portal mid-install must fail
 // clean, and the next normal visit must then work offline.
 // Same CACHE_VERSION, but APP_FILES now names a file that is not there.
-// The failed install must leave snack-shack-1 in place.
+// The failed install must leave the live cache in place.
 async function runSameVersionFailure(browser, browserName) {
   const context = await browser.newContext({
     viewport: { width: 1024, height: 768 },
@@ -1749,7 +1866,7 @@ async function runSameVersionFailure(browser, browserName) {
         after.v1core &&
         after.v1 >= appFiles.length &&
         after.v1 === before.v1 &&
-        after.names.indexOf("snack-shack-1") !== -1 &&
+        after.names.indexOf(LIVE_CACHE) !== -1 &&
         after.installingCache.length === 0,
       state + " before " + before.v1 + " after " + JSON.stringify(after)
     );
@@ -1855,6 +1972,452 @@ async function runPartialFirstInstall(browser, browserName, server, base, label)
   }
 }
 
+// The drawings should be on screen before a screenshot, not the emoji.
+async function waitForOptionDrawings(page) {
+  await page.waitForFunction(() => {
+    const imgs = document.querySelectorAll("#options-screen .option-icon img");
+    if (imgs.length < 7) {
+      return false;
+    }
+    for (let i = 0; i < imgs.length; i++) {
+      const img = imgs[i];
+      if (img.hidden || !img.complete || img.naturalWidth < 1) {
+        return false;
+      }
+    }
+    return true;
+  });
+}
+
+async function openSnackOptions(page, id) {
+  const button = page.locator(`.menu-item[data-id="${id}"]`);
+  if (!(await button.isVisible())) {
+    for (const tab of ["food", "drinks", "treats"]) {
+      await page.locator(`.tab[data-category="${tab}"]`).click();
+      if (await button.isVisible()) {
+        break;
+      }
+    }
+  }
+  await button.click();
+  await page.locator("#options-screen").waitFor({ state: "visible" });
+}
+
+async function pageOverflows(page) {
+  return page.evaluate(() => {
+    const root = document.scrollingElement || document.documentElement;
+    return root.scrollHeight > window.innerHeight + 2;
+  });
+}
+
+// One-tap snacks, 64px targets, Back, and four ticket rows.
+// Runs at every viewport. The detailed options story is runOptions.
+async function checkOptionsLayout(page, label, width, height) {
+  const errorsBefore = page.__errors.length;
+  await page.locator('.menu-item[data-id="fries"]').click();
+  await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$2");
+  const friesOpened = await page.locator("#options-screen").isVisible();
+  check(label + " snacks without options add in one tap", friesOpened === false);
+  await page.locator('[data-action="minus"][data-id="fries"]').click();
+  await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$0");
+
+  await openSnackOptions(page, "burger");
+  await page.waitForFunction(() => {
+    const img = document.querySelector('[data-option-id="ketchup"] img');
+    return !!(img && !img.hidden);
+  });
+  const targets = await page.evaluate(() => {
+    const buttons = document.querySelectorAll("#options-screen button");
+    const small = [];
+    buttons.forEach((button) => {
+      const box = button.getBoundingClientRect();
+      if (box.width < 63.5 || box.height < 63.5) {
+        const name = button.getAttribute("data-option-id") || button.id || button.textContent.replace(/\s+/g, " ").trim();
+        small.push(name + " " + Math.round(box.width) + "x" + Math.round(box.height));
+      }
+    });
+    return { small: small, count: buttons.length };
+  });
+  check(
+    label + " option targets are at least 64x64",
+    targets.small.length === 0 && targets.count >= 9,
+    targets.small.join(", ") + " buttons " + targets.count
+  );
+  check(label + " options screen does not scroll the page", (await pageOverflows(page)) === false);
+
+  await page.locator('[data-option-id="ketchup"]').click();
+  await page.locator("#options-back").click();
+  await page.locator("#options-screen").waitFor({ state: "hidden" });
+  const afterBack = await page.locator("#ticket-total").textContent();
+  const burgerRows = await page.locator('.ticket-row[data-id="burger"]').count();
+  check(label + " Back adds nothing", afterBack === "$0" && burgerRows === 0, afterBack + " rows " + burgerRows);
+
+  const landscapeIpad = (width === 1024 && height === 768) || (width === 1180 && height === 820);
+  if (landscapeIpad) {
+    await openSnackOptions(page, "burger");
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await openSnackOptions(page, "hot-dog");
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await openSnackOptions(page, "cheeseburger");
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await page.locator('.tab[data-category="drinks"]').click();
+    await openSnackOptions(page, "soda");
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await openSnackOptions(page, "milkshake");
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.querySelectorAll(".line-options").length >= 5);
+    await page.evaluate(() => (document.fonts ? document.fonts.ready : null));
+    const fit = await page.evaluate(() => {
+      const list = document.querySelector("#ticket-lines");
+      const listBox = list.getBoundingClientRect();
+      const rows = document.querySelectorAll(".ticket-row");
+      let whole = 0;
+      rows.forEach((row) => {
+        if (!row.querySelector(".line-options")) {
+          return;
+        }
+        const box = row.getBoundingClientRect();
+        if (box.top >= listBox.top - 2 && box.bottom <= listBox.bottom + 2 && box.height >= 60) {
+          whole += 1;
+        }
+      });
+      const root = document.scrollingElement || document.documentElement;
+      return {
+        whole: whole,
+        total: rows.length,
+        pageScrolls: root.scrollHeight > window.innerHeight + 2,
+        listHeight: Math.round(listBox.height)
+      };
+    });
+    check(
+      label + " landscape ticket shows at least 4 whole rows with options",
+      fit.whole >= 4 && fit.pageScrolls === false,
+      JSON.stringify(fit)
+    );
+  }
+  check(
+    label + " options layout has no page errors",
+    page.__errors.length === errorsBefore,
+    page.__errors.slice(errorsBefore).join(" | ")
+  );
+}
+
+async function focusedId(page) {
+  return page.evaluate(() => {
+    const el = document.activeElement;
+    if (!el) {
+      return "";
+    }
+    return el.id || el.getAttribute("data-id") || el.getAttribute("data-action") || el.className;
+  });
+}
+
+async function runOptions(browser, browserName) {
+  const context = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    serviceWorkers: "allow"
+  });
+  const page = await context.newPage();
+  page.__errors = track(page, new URL(BASE).origin);
+  const label = browserName + " options";
+  try {
+    await page.goto(BASE, { waitUntil: "load" });
+    // Ketchup's drawing is requested at startup, before any tap.
+    await page.waitForFunction(() =>
+      performance.getEntriesByType("resource").some((entry) => entry.name.indexOf("assets/options/ketchup.svg") !== -1)
+    );
+    await page.evaluate(() => {
+      window.__iconSeen = [];
+      const root = document.getElementById("options-groups");
+      const obs = new MutationObserver(() => {
+        const button = document.querySelector('#options-screen [data-option-id="ketchup"]');
+        if (!button) {
+          return;
+        }
+        const img = button.querySelector("img");
+        const emoji = button.querySelector(".emoji");
+        if (!img || !emoji) {
+          return;
+        }
+        window.__iconSeen.push({ imgHidden: img.hidden, emojiHidden: emoji.hidden });
+      });
+      obs.observe(root, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden"]
+      });
+    });
+    await page.locator('.menu-item[data-id="burger"]').click();
+    await page.locator("#options-screen").waitFor({ state: "visible" });
+    await page.waitForFunction(() => document.activeElement && document.activeElement.id === "options-title");
+    const firstPaint = await page.evaluate(() => (window.__iconSeen || [])[0] || null);
+    check(
+      label + " a preloaded icon is already showing",
+      !!(firstPaint && firstPaint.imgHidden === false && firstPaint.emojiHidden === true),
+      JSON.stringify(firstPaint)
+    );
+    const toppings = ["ketchup", "mustard", "mayo", "pickles", "lettuce", "tomato", "onion"];
+    for (const id of toppings) {
+      const count = await page.locator(`[data-option-id="${id}"]`).count();
+      check(label + " burger has " + id, count === 1, "count " + count);
+    }
+    const ketchup = page.locator('[data-option-id="ketchup"]');
+    check(label + " toppings start off", (await ketchup.getAttribute("aria-pressed")) === "false");
+    await ketchup.click();
+    check(label + " a topping toggles on", (await ketchup.getAttribute("aria-pressed")) === "true");
+    await ketchup.click();
+    check(label + " a topping toggles off", (await ketchup.getAttribute("aria-pressed")) === "false");
+    await page.locator("#options-back").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    const backFocus = await page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.classList.contains("menu-item") ? el.getAttribute("data-id") : "";
+    });
+    check(
+      label + " Back returns focus to the snack and adds nothing",
+      backFocus === "burger" && (await page.locator("#ticket-total").textContent()) === "$0",
+      backFocus
+    );
+
+    await page.evaluate(() => {
+      window.__iconSeen = [];
+    });
+    await openSnackOptions(page, "burger");
+    const reopened = await page.evaluate(() => (window.__iconSeen || [])[0] || null);
+    check(
+      label + " a loaded icon shows with no emoji flash",
+      !!(reopened && reopened.imgHidden === false && reopened.emojiHidden === true),
+      JSON.stringify(reopened)
+    );
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
+    const plain = await page.locator(".line-options").innerText();
+    const addFocus = await page.evaluate(() => {
+      const el = document.activeElement;
+      return el && el.classList.contains("menu-item") ? el.getAttribute("data-id") : "";
+    });
+    check(label + " no toppings read as Plain", plain === "Plain" && addFocus === "burger", plain + " focus " + addFocus);
+
+    await openSnackOptions(page, "burger");
+    await page.locator("#options-add").click();
+    await page.waitForFunction(() => {
+      const row = document.querySelector('.ticket-row[data-id="burger"] .qty-number');
+      return row && row.textContent === "2" && document.querySelectorAll('.ticket-row[data-id="burger"]').length === 1;
+    });
+    check(label + " the same options add to the same line", (await page.locator("#ticket-total").textContent()) === "$6");
+
+    await openSnackOptions(page, "burger");
+    await page.locator('[data-option-id="ketchup"]').click();
+    await page.locator('[data-option-id="pickles"]').click();
+    await page.locator("#options-add").click();
+    await page.waitForFunction(() => document.querySelectorAll('.ticket-row[data-id="burger"]').length === 2);
+    const lines = await page.locator(".line-options").allInnerTexts();
+    check(
+      label + " different options are a separate line",
+      lines.indexOf("Plain") !== -1 && lines.indexOf("Ketchup, Pickles") !== -1 && (await page.locator("#ticket-total").textContent()) === "$9",
+      lines.join(" | ")
+    );
+
+    await page.locator("#done-button").click();
+    await page.waitForFunction(() => !document.querySelector("#summary-screen").hidden);
+    const summary = await page.locator("#summary-lines").innerText();
+    check(
+      label + " summary lists the options",
+      summary.indexOf("Plain") !== -1 && summary.indexOf("Ketchup, Pickles") !== -1,
+      summary
+    );
+    await page.locator("#edit-order").click();
+    await page.waitForFunction(() => !document.querySelector("#menu-screen").hidden);
+
+    await page.locator(".line-details", { hasText: "Plain" }).click();
+    await page.locator("#options-screen").waitFor({ state: "visible" });
+    const updateLabel = await page.locator("#options-add-label").textContent();
+    check(label + " reopening a line says Update", updateLabel === "Update", updateLabel);
+    await page.locator('[data-option-id="ketchup"]').click();
+    await page.locator('[data-option-id="pickles"]').click();
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    await page.waitForFunction(() => document.querySelectorAll('.ticket-row[data-id="burger"]').length === 1);
+    const mergedQty = await page.locator('.ticket-row[data-id="burger"] .qty-number').textContent();
+    const mergedText = await page.locator(".line-options").innerText();
+    const updateFocus = await page.evaluate(() => {
+      const el = document.activeElement;
+      return el ? el.getAttribute("data-action") : "";
+    });
+    check(
+      label + " Update merges into the matching line",
+      mergedQty === "3" && mergedText === "Ketchup, Pickles" && updateFocus === "edit" && (await page.locator("#ticket-total").textContent()) === "$9",
+      mergedQty + " " + mergedText + " focus " + updateFocus
+    );
+
+    await page.locator('.tab[data-category="drinks"]').click();
+    await openSnackOptions(page, "milkshake");
+    const chocolate = await page.locator('[data-option-id="chocolate"]').getAttribute("aria-checked");
+    const vanilla = await page.locator('[data-option-id="vanilla"]').getAttribute("aria-checked");
+    const strawberry = await page.locator('[data-option-id="strawberry"]').getAttribute("aria-checked");
+    check(
+      label + " a flavor starts selected",
+      chocolate === "true" && vanilla === "false" && strawberry === "false",
+      [chocolate, vanilla, strawberry].join(",")
+    );
+    await page.locator('[data-option-id="chocolate"]').focus();
+    await page.keyboard.press("ArrowRight");
+    const afterArrow = await page.locator('[data-option-id="vanilla"]').getAttribute("aria-checked");
+    const chocolateOff = await page.locator('[data-option-id="chocolate"]').getAttribute("aria-checked");
+    check(label + " arrow keys move the flavor", afterArrow === "true" && chocolateOff === "false", afterArrow + " " + chocolateOff);
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    const tab = await page.locator(".tab.is-selected").getAttribute("data-category");
+    const shake = await page.locator('.ticket-row[data-id="milkshake"] .line-options').innerText();
+    check(
+      label + " Add stays on the same tab and keeps the flavor",
+      tab === "drinks" && shake === "Vanilla" && (await page.locator("#ticket-total").textContent()) === "$12",
+      tab + " " + shake
+    );
+
+    await page.locator('.tab[data-category="treats"]').click();
+    await openSnackOptions(page, "ice-cream-cone");
+    const sprinkles = page.locator('[data-option-id="sprinkles"]');
+    check(label + " sprinkles start off", (await sprinkles.getAttribute("aria-pressed")) === "false");
+    check(
+      label + " ice cream flavor starts on chocolate",
+      (await page.locator('[data-option-id="chocolate"]').getAttribute("aria-checked")) === "true"
+    );
+    await sprinkles.click();
+    await page.locator("#options-add").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+    const cone = await page.locator('.ticket-row[data-id="ice-cream-cone"] .line-options').innerText();
+    check(label + " ice cream can add sprinkles", cone === "Chocolate, Sprinkles", cone);
+
+    await page.locator('.tab[data-category="drinks"]').click();
+    await openSnackOptions(page, "soda");
+    check(label + " soda starts on Ice", (await page.locator('[data-option-id="with-ice"]').getAttribute("aria-checked")) === "true");
+    await page.locator('[data-option-id="with-ice"]').click();
+    check(label + " the chosen flavor stays chosen", (await page.locator('[data-option-id="with-ice"]').getAttribute("aria-checked")) === "true");
+    await page.locator('[data-option-id="no-ice"]').click();
+    check(label + " soda can switch to No ice", (await page.locator('[data-option-id="no-ice"]').getAttribute("aria-checked")) === "true");
+    await page.locator("#options-back").click();
+    await page.locator("#options-screen").waitFor({ state: "hidden" });
+
+    if (browserName === "chromium") {
+      const shotDir = join(ARTIFACTS, "screenshots");
+      mkdirSync(shotDir, { recursive: true });
+      await openSnackOptions(page, "burger");
+      await page.locator('[data-option-id="ketchup"]').click();
+      await page.locator('[data-option-id="pickles"]').click();
+      await waitForOptionDrawings(page);
+      await page.screenshot({ path: join(shotDir, "options_landscape.png") });
+      await page.locator("#options-back").click();
+      await page.locator("#options-screen").waitFor({ state: "hidden" });
+      await page.screenshot({ path: join(shotDir, "ticket_landscape.png") });
+      await page.setViewportSize({ width: 768, height: 1024 });
+      await openSnackOptions(page, "burger");
+      await waitForOptionDrawings(page);
+      await page.screenshot({ path: join(shotDir, "options_portrait.png") });
+      await page.locator("#options-back").click();
+      await page.locator("#options-screen").waitFor({ state: "hidden" });
+      await page.screenshot({ path: join(shotDir, "ticket_portrait.png") });
+    }
+
+    check(label + " no page errors", page.__errors.length === 0, page.__errors.join(" | "));
+  } finally {
+    await context.close();
+  }
+
+  const badContext = await browser.newContext({
+    viewport: { width: 1024, height: 768 },
+    serviceWorkers: "allow"
+  });
+  const badPage = await badContext.newPage();
+  badPage.__errors = track(badPage, new URL(BASE).origin);
+  await badPage.route("**/menu.js", async (route) => {
+    const response = await route.fetch();
+    let body = await response.text();
+    body = body.replace(
+      'var BURGER_TOPPINGS = [\n  {\n    id: "ketchup",',
+      'var BURGER_TOPPINGS = [\n  null,\n  { id: "bad id", name: "Weird" },\n  { id: "ketchup", name: "" },\n  {\n    id: "ketchup",'
+    );
+    body = body.replace(
+      'icon: "assets/options/mayo.svg"',
+      'icon: "assets/options/missing-mayo.svg"'
+    );
+    body = body.replace(
+      'icon: "assets/options/relish.svg"',
+      'icon: "assets/options/missing-relish.svg"'
+    );
+    body = body.replace(
+      'image: "assets/food/fries.svg"\n        },',
+      'image: "assets/food/fries.svg",\n          options: "nope"\n        },'
+    );
+    body = body.replace(
+      'image: "assets/food/cookie.svg"\n        }',
+      'image: "assets/food/cookie.svg",\n          options: [{ id: "extras", name: "Extras", pick: "sideways", choices: [{ id: "x", name: "X" }] }]\n        }'
+    );
+    await route.fulfill({ status: 200, contentType: "text/javascript", body });
+  });
+  try {
+    await badPage.goto(BASE, { waitUntil: "load" });
+    await badPage.waitForFunction(() => {
+      const note = document.querySelector("#menu-note");
+      return note && !note.hidden && /skipped/i.test(note.textContent);
+    });
+    const note = await badPage.locator("#menu-note").evaluate((el) => el.textContent);
+    check(browserName + " options bad entries are skipped", /skipped/i.test(note) && /Fries/.test(note) && /Weird/.test(note), note.slice(0, 240));
+    await badPage.locator('.menu-item[data-id="fries"]').click();
+    await badPage.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$2");
+    const friesOpened = await badPage.locator("#options-screen").isVisible();
+    check(browserName + " options a snack with bad options still adds in one tap", friesOpened === false);
+    await badPage.locator('.tab[data-category="treats"]').click();
+    await badPage.locator('.menu-item[data-id="cookie"]').click();
+    await badPage.waitForFunction(() => document.querySelector("#ticket-total").textContent === "$3");
+    const cookieOpened = await badPage.locator("#options-screen").isVisible();
+    check(browserName + " options a bad group does not open the screen", cookieOpened === false);
+    await badPage.locator('.tab[data-category="food"]').click();
+    await openSnackOptions(badPage, "burger");
+    const weird = await badPage.locator('[data-option-id="Weird"], [data-option-id="bad id"]').count();
+    const ketchupLeft = await badPage.locator('[data-option-id="ketchup"]').count();
+    check(browserName + " options a bad choice is not a button", weird === 0 && ketchupLeft === 1, "weird " + weird + " ketchup " + ketchupLeft);
+    await badPage.waitForFunction(() => {
+      const button = document.querySelector('[data-option-id="mayo"]');
+      if (!button) {
+        return false;
+      }
+      const img = button.querySelector("img");
+      const emoji = button.querySelector(".emoji");
+      return !!(img && img.hidden && emoji && !emoji.hidden && emoji.textContent);
+    });
+    check(browserName + " options a missing icon falls back to emoji", true);
+    await badPage.waitForFunction(() => {
+      const note = document.querySelector("#menu-note");
+      if (!note) {
+        return false;
+      }
+      const text = note.textContent || "";
+      return text.indexOf("assets/options/missing-mayo.svg") !== -1 && text.indexOf("assets/options/missing-relish.svg") !== -1;
+    });
+    const iconLines = await badPage.locator("#menu-note-body p").evaluateAll((nodes) =>
+      nodes.map((node) => node.textContent).filter((text) => text.indexOf("These option pictures didn't load:") === 0)
+    );
+    check(
+      browserName + " options missing icons share one yellow-note sentence",
+      iconLines.length === 1 &&
+        iconLines[0].indexOf("assets/options/missing-mayo.svg") !== -1 &&
+        iconLines[0].indexOf("assets/options/missing-relish.svg") !== -1,
+      JSON.stringify(iconLines)
+    );
+    check(browserName + " options bad data does not crash", badPage.__errors.length === 0, badPage.__errors.join(" | "));
+  } finally {
+    await badContext.close();
+  }
+}
+
 function copyApp() {
   const dest = mkdtempSync(join(tmpdir(), "snack-shack-"));
   cpSync(ROOT, dest, {
@@ -1953,7 +2516,7 @@ async function main() {
   );
   check(
     "CACHE_VERSION names this release's own cache",
-    swSource.indexOf('var CACHE_VERSION = "1"') !== -1 &&
+    swSource.indexOf('var CACHE_VERSION = "2"') !== -1 &&
       swSource.indexOf('var CACHE_NAME = "snack-shack-" + CACHE_VERSION') !== -1 &&
       swSource.indexOf('var INSTALL_CACHE = CACHE_NAME + "-installing"') !== -1 &&
       swSource.indexOf("function isOlderCopy(name)") !== -1 &&
@@ -1972,6 +2535,7 @@ async function main() {
       readme.indexOf("Netlify") === -1
   );
   check("repo has an empty .nojekyll", statSync(join(ROOT, ".nojekyll")).isFile() && statSync(join(ROOT, ".nojekyll")).size === 0);
+  check("options.js is in the precache list", appFiles.indexOf("options.js") !== -1);
   check(
     "page blocks selection, callouts, and tap flash",
     css.includes("-webkit-user-select: none") &&
@@ -2022,6 +2586,7 @@ async function main() {
       await guard(name + " picture", () => runPictureNote(browser, name));
       await guard(name + " subfolder", () => runSubfolder(browser, name));
       await guard(name + " logic", () => runLogic(browser, name));
+      await guard(name + " options", () => runOptions(browser, name));
       if (name === "chromium") {
         const fileBrowser = await chromium.launch({ args: ["--allow-file-access-from-files"] });
         try {

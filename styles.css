@@ -506,6 +506,35 @@ button {
   line-height: 1.1;
 }
 
+/* Toppings or a flavor, under the name. "Plain" means none were picked.
+   Kept small so four ticket rows still fit on a landscape iPad. */
+.line-options,
+.summary-options {
+  display: block;
+  margin-top: 1px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+/* The name and the choices are the tap target for changing a line.
+   It is not a chunky button. The + and − beside it already are. */
+.line-details {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  margin: 0;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
 .line-price {
   font-size: 1.15rem;
   font-weight: 800;
@@ -720,6 +749,14 @@ button {
   font-variant-numeric: tabular-nums;
 }
 
+.summary-item {
+  min-width: 0;
+}
+
+.summary-name {
+  display: block;
+}
+
 .summary-total {
   margin-top: 8px;
   padding-top: 8px;
@@ -734,6 +771,180 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+/* ----------------------------------------------------------------
+   Options: toppings and flavors
+   Full screen under the title. The page itself does not scroll.
+   The choice list scrolls only if a short phone cannot fit them.
+---------------------------------------------------------------- */
+
+.options-screen {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 16px 14px;
+  overflow: hidden;
+}
+
+.options-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 4px solid var(--outline);
+  border-radius: 28px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+  padding: 12px 16px 14px;
+}
+
+.options-heading {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.options-heading .screen-heading {
+  margin: 0;
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.options-picture {
+  width: 96px;
+  height: 96px;
+  flex: none;
+}
+
+.options-picture .emoji,
+.options-picture img {
+  width: 96px;
+  height: 96px;
+  font-size: 72px;
+}
+
+.options-groups {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 4px;
+}
+
+.options-group-name {
+  margin: 0 0 6px;
+  font-family: var(--font-sign);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.options-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+.option-button {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 8px 6px 10px;
+  border: 4px solid var(--outline);
+  border-radius: 20px;
+  background: var(--paper);
+  box-shadow: var(--chunky);
+  font-family: var(--font-sign);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+}
+
+.option-button:active {
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+/* Selected: yellow, pressed down, and a check. Color is not the only clue. */
+.option-button.is-selected {
+  background: var(--yellow);
+  transform: translateY(4px);
+  box-shadow: var(--chunky-pressed);
+}
+
+.option-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+}
+
+.option-icon > * {
+  grid-area: 1 / 1;
+}
+
+.option-icon img,
+.option-icon .emoji {
+  width: 72px;
+  height: 72px;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.option-name {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.option-mark {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--outline);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+.options-actions {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding-top: 12px;
+}
+
+/* Two classes beat .btn in buttons.css, so these stay big on a tablet. */
+.options-actions .options-back,
+.options-actions .options-add {
+  width: 100%;
+  min-width: 64px;
+  min-height: 64px;
+  font-size: 1.45rem;
+  font-weight: 700;
 }
 
 .visually-hidden {
@@ -760,7 +971,9 @@ button {
   .done-button:active,
   .edit-button:active,
   .new-button:active,
-  .mute-button:active {
+  .mute-button:active,
+  .option-button:active,
+  .option-button.is-selected {
     transform: none;
   }
 }
@@ -1200,6 +1413,65 @@ button {
   /* Two classes, so this stays 64px tall even with buttons.css loaded. */
   .summary-actions .edit-button,
   .summary-actions .new-button {
+    min-height: 64px;
+    font-size: 1.15rem;
+  }
+
+  /* Very little height. Shrink the snack picture, not the choice buttons.
+     The choice list scrolls inside the card. The page does not. */
+  .options-screen {
+    padding: 2px 8px 8px;
+  }
+
+  .options-card {
+    padding: 8px 10px 8px;
+  }
+
+  .options-heading {
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .options-heading .screen-heading {
+    font-size: 1.35rem;
+  }
+
+  .options-picture,
+  .options-picture .emoji,
+  .options-picture img {
+    width: 64px;
+    height: 64px;
+    font-size: 48px;
+  }
+
+  .options-group-name {
+    margin-bottom: 4px;
+    font-size: 1rem;
+  }
+
+  .options-choice-grid {
+    gap: 8px;
+  }
+
+  .option-button {
+    padding: 6px 4px;
+  }
+
+  .option-icon,
+  .option-icon img,
+  .option-icon .emoji {
+    width: 64px;
+    height: 64px;
+    font-size: 40px;
+  }
+
+  .options-actions {
+    gap: 8px;
+    padding-top: 8px;
+  }
+
+  .options-actions .options-back,
+  .options-actions .options-add {
     min-height: 64px;
     font-size: 1.15rem;
   }

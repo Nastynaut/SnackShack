@@ -95,6 +95,30 @@
     </aside>
   </main>
 
+  <!--
+    Screen between the menu and the summary. Hidden until a snack
+    with toppings or flavors is tapped. options.js fills it in.
+  -->
+  <main id="options-screen" class="options-screen" hidden>
+    <section class="options-card" aria-labelledby="options-title">
+      <header class="options-heading">
+        <div id="options-picture" class="picture options-picture" aria-hidden="true"></div>
+        <h2 id="options-title" class="screen-heading" tabindex="-1">Options</h2>
+      </header>
+      <div id="options-groups" class="options-groups"></div>
+      <div class="options-actions">
+        <button type="button" id="options-back" class="options-back btn btn--secondary">
+          <span class="btn-icon" aria-hidden="true">↩️</span>
+          <span>Back</span>
+        </button>
+        <button type="button" id="options-add" class="options-add btn btn--primary">
+          <span class="btn-icon" aria-hidden="true">✅</span>
+          <span id="options-add-label">Add to Ticket</span>
+        </button>
+      </div>
+    </section>
+  </main>
+
   <!-- Screen 2: read the order back. Hidden until Done is tapped. -->
   <main id="summary-screen" class="summary-screen" hidden>
     <section class="summary-card">
@@ -146,6 +170,8 @@
     });
   </script>
   <script src="menu.js"></script>
+  <!-- The toppings and flavors screen. It has to load before app.js. -->
+  <script src="options.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
